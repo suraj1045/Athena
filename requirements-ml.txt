@@ -1,0 +1,13 @@
+# ─────────────────────────────────────────────────────────────
+# Athena — ML / Training & Inference Dependencies
+# Install: pip install -r requirements-ml.txt
+# ─────────────────────────────────────────────────────────────
+
+-r requirements.txt
+ultralytics>=8.1.0
+onnxruntime>=1.17.0
+torch>=2.1.0
+torchvision>=0.16.0
+imagehash>=4.3.0
+# OCR library (Free alternative to Rekognition)
+easyocr>=1.7.1

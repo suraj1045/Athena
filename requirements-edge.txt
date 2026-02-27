@@ -1,0 +1,10 @@
+# ─────────────────────────────────────────────────────────────
+# Athena — Edge Device Dependencies
+# Minimal footprint for Greengrass / Outposts deployment
+# ─────────────────────────────────────────────────────────────
+
+numpy>=1.26.0
+opencv-python-headless>=4.9.0
+boto3>=1.34.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0

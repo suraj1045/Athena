@@ -1,0 +1,52 @@
+# Athena — Docker Compose for Free & Open-Source (FOSS) local infrastructure
+# Spins up the required databases and messaging queues for the FastAPI backend.
+
+version: "3.9"
+
+services:
+  # ── PostgreSQL Database (Replaces DynamoDB) ───────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: athena-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: athena
+      POSTGRES_PASSWORD: athena_secret
+      POSTGRES_DB: athena_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U athena -d athena_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis Server (Replaces SNS / SQS) ─────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: athena-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+
+  # ── MinIO Server (Replaces AWS S3) ────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: athena-minio
+    ports:
+      - "9000:9000"   # API Port
+      - "9001:9001"   # Console Port
+    environment:
+      MINIO_ROOT_USER: athena_minio_admin
+      MINIO_ROOT_PASSWORD: athena_minio_secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

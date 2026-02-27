@@ -205,3 +205,29 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ── Athena Project-Specific ──────────────────────────────────
+.DS_Store
+
+# Model weights (large binary files)
+data/models/**/*.pt
+data/models/**/*.pth
+data/models/**/*.onnx
+data/models/**/*.tar.gz
+
+# Terraform state (managed remotely)
+infrastructure/**/.terraform/
+infrastructure/**/*.tfstate
+infrastructure/**/*.tfstate.backup
+infrastructure/**/*.tfplan
+
+# Node modules (dashboard apps)
+dashboard/**/node_modules/
+dashboard/**/.next/
+dashboard/**/dist/
+
+# LocalStack data
+localstack-data/
+
+# Lambda deployment packages
+dist/*.zip

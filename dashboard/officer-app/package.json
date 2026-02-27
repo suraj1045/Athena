@@ -1,0 +1,29 @@
+{
+  "name": "athena-officer-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Athena Officer Dashboard — React Native mobile app for field officers",
+  "main": "src/App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "react": "18.2.0",
+    "react-native": "0.73.0",
+    "react-native-maps": "^1.8.0",
+    "@react-navigation/native": "^6.1.0",
+    "@react-navigation/stack": "^6.3.0",
+    "aws-amplify": "^6.0.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.50.0"
+  }
+}

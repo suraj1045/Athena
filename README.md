@@ -1,67 +1,100 @@
-# Athena: Urban Intelligence for Inclusive & Fluid Cities 🏙️🛡️
+# 🏛️ Athena — Open Source Urban Intelligence Platform
+> AI-powered, privacy-first computer vision for inclusive and fluid cities.
 
-**Track 03:** AI for Communities, Access & Public Impact  
-**Powered by:** AWS | **Innovation Partner:** Hack2Skill  
-
----
-
-## 📌 Project Overview
-**Athena** is an AI-powered urban intelligence platform designed to leverage existing citywide camera networks to enhance law enforcement, optimize traffic flow, and improve community access to real-time public information. 
-
-Much like its namesake, Athena watches over the city—not just as a tool for surveillance, but as a community assistant that identifies "urban friction" (accidents, breakdowns, and safety threats) to keep the city moving and safe.
-
-### ⚠️ The Problem
-* **The "GPS Lag":** Current navigation apps detect traffic 10-15 minutes *after* it builds up.
-* **Urban Blind Spots:** Emergency services lose the "Golden Hour" due to undetected road blockages.
-* **Resource Strain:** Police manpower is often wasted on manual monitoring or random checkpoints for non-critical violations.
-
-### ✅ The Athena Solution
-Athena uses real-time Computer Vision to bridge the gap between civic data and citizen action. It identifies the **root cause** of disruptions the second they happen, allowing for instant rerouting and faster emergency response.
+**Athena** is a real-time smart city platform designed to run directly on existing CCTV networks. This repository is built as a **100% Free and Open-Source Software (FOSS)** stack, utilizing local resources and local models to completely eliminate cloud computing costs.
 
 ---
 
-## 🚀 Key Functional Pillars
+## 🏗 System Architecture (FOSS Stack)
 
-### 1. Real-Time Community Mobility (API Integration)
-* **Incident Detection:** AI vision automatically identifies stalled cars, breakdowns, and accidents from live city feeds.
-* **Instant Map Updates:** Pushes live disruption data to navigation APIs (e.g., Google Maps/Apple Maps) to reroute commuters before traffic builds up.
-* **Clearance Alerts:** Updates the system immediately once the road is cleared, restoring original routes.
+Athena uses a modern, open-source tech stack to achieve enterprise-grade scale tracking and anomaly detection locally:
 
-### 2. Critical Incident Guardian (Public Safety)
-* **Automated Tracking:** Scans the city grid for specific "Make + Model + Number Plate" combinations in cases of kidnapping or hit-and-runs.
-* **Live Pursuit Support:** Provides real-time movement updates and location pings to the dispatch center and nearby patrol units.
-
-### 3. Proximity-Based Resource Optimization
-* **Smart Intercept Alerts:** Flags vehicles with non-critical violations (expired permits/fines) only when they are moving toward a patrolling officer’s current location.
-* **Officer Dashboard:** A dedicated mobile app for police to receive "intercept alerts," eliminating the need for constant manual monitoring.
-
----
-
-## 🛠️ Technical Architecture
-
-Athena is built on a serverless, highly scalable AWS-native architecture:
-
-| Component | AWS Service Used | Purpose |
-| :--- | :--- | :--- |
-| **Ingestion** | Amazon Kinesis Video Streams | Secure, real-time video feed management from city CCTV. |
-| **AI/ML Vision** | Amazon SageMaker | Custom training/deployment of behavior models (stalled cars, etc.). |
-| **Object ID** | Amazon Rekognition | High-speed ANPR and vehicle attribute (Make/Model) identification. |
-| **Orchestration** | AWS Lambda | Serverless compute for event-driven logic and anomaly triggering. |
-| **Notifications** | Amazon SNS | Sub-second push alerts to authorities and 3rd-party Map APIs. |
-| **Data Storage** | Amazon S3 | Cost-effective archival for historical analysis and fine-tuning. |
+1. **Ingestion:** `cv2` and Fast-API backend accepting RTSP video streams.
+2. **AI / ML Layer:**
+   - **YOLOv8** running locally via PyTorch (`ultralytics`) for real-time vehicle and pedestrian anomaly detection.
+   - **EasyOCR** for free, local License Plate Recognition (ANPR).
+3. **Core Services:**
+   - **FastAPI** provides the REST backbone for managing state and routing data.
+   - **Redis** handles inter-service event messaging and task queuing.
+4. **Data Layer:**
+   - **PostgreSQL** (with PostGIS) handles fast geospatial queries for proximity and alerts.
+   - **MinIO** provides a local S3-compatible object storage layer for archiving flagged video frames.
+5. **Dashboard Layer:**
+   - **React / Vite** + Mapbox / Leaflet JS for local Command Center displays.
+   - **React Native** for field officer alerts.
 
 ---
 
-## 💰 Implementation Cost & Sustainability
+## 💡 Free Alternatives for Prototype
 
-Athena follows a **Zero Hardware CAPEX** model by retrofitting existing infrastructure.
+This repository was specifically tailored to be completely free to run during prototyping and incubation. The following premium cloud services were swapped for open-source alternatives:
 
-### 📍 Pilot Zone Estimates (150 Cameras)
-* **Initial Development (MVP):** ₹30 Lakhs – ₹70 Lakhs (Pilot deployment in 1 high-traffic corridor).
-* **Monthly Operational Cost:** ₹85,000 – ₹1,60,000 (Scalable "Pay-As-You-Go" pricing).
+| Enterprise Cloud (Paid)         | Athena FOSS Alternative (100% Free) |
+|---------------------------------|--------------------------------------|
+| **Kinesis Video Streams**       | Direct OpenCV (`cv2`) / HTTP streams |
+| **SageMaker Real-Time**         | Local PyTorch (`ultralytics` YOLOv8) |
+| **Amazon Rekognition**          | `EasyOCR` (Local LPR)                |
+| **AWS Lambda**                  | Local `FastAPI` Server               |
+| **Amazon DynamoDB**             | PostgreSQL via Docker                |
+| **Amazon SNS / SQS**            | Redis Pub/Sub via Docker             |
+| **Amazon S3**                   | MinIO Server via Docker              |
+| **Google Maps API**             | OpenStreetMap (`nominatim`)          |
 
-### 🌱 Long-Term Impact
-* **Sustainability:** Using AWS Savings Plans for SageMaker reduces long-term costs by up to 64%.
-* **Community Value:** Drastically reduces citywide fuel wastage, lowers carbon emissions, and protects the "Golden Hour" for medical emergencies.
+All infrastructure definitions (Terraform) and AWS-specific modules (Boto3) were completely removed to guarantee zero unexpected cloud costs.
 
 ---
+
+## 🚀 Quick Start (Local Development)
+
+Because this is a FOSS repo, you can run the entire infrastructure via Docker Desktop! Ensure you have `docker` and `docker-compose` installed.
+
+### 1. Setup Environment
+```bash
+cp .env.example .env
+```
+Modify local variables if necessary, but defaults work out-of-the-box.
+
+### 2. Start Infrastructure
+Start the local PostgreSQL, Redis, and MinIO servers:
+```bash
+docker-compose up -d
+```
+
+### 3. Install Backend & AI
+We recommend using Python 3.11 with `venv`.
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Install core Fast-API and DB dependencies
+make install
+
+# Install PyTorch, YOLO, and EasyOCR
+make install-ml
+```
+
+### 4. Run the Engine
+Run the FastAPI backend which drives the ingestion and local tracking logic:
+```bash
+uvicorn src.services.main:app --host 0.0.0.0 --port 8000 --reload
+```
+View the swagger docs locally at: `http://localhost:8000/docs`.
+
+---
+
+## 🛡️ Privacy by Design
+
+Because Athena is designed to be self-hosted, **data never leaves your private network**.
+All ML inference happens locally. Hard drives belong to your infrastructure.
+There are zero external callbacks to commercial AI APIs.
+
+---
+
+## 🤝 Contributing
+
+Per `Agent.md`, no logic changes are accepted without Tier 1 tests.
+```bash
+make lint
+make typecheck
+make test
+```

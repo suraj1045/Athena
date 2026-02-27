@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────
+# Athena — Core Dependencies (Free & Open Source Stack)
+# Install: pip install -r requirements.txt
+# For ML training/inference: pip install -r requirements-ml.txt
+# For development: pip install -e ".[dev]"
+# ─────────────────────────────────────────────────────────────
+
+fastapi>=0.104.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
+redis>=5.0.0
+minio>=7.2.0
+aiohttp>=3.9.0
+numpy>=1.26.0
+opencv-python-headless>=4.9.0
+python-multipart>=0.0.6
