@@ -21,6 +21,7 @@ class IncidentType(str, Enum):
     STALLED_VEHICLE = "STALLED_VEHICLE"
     BREAKDOWN = "BREAKDOWN"
     ACCIDENT = "ACCIDENT"
+    PEDESTRIAN_VIOLATION = "PEDESTRIAN_VIOLATION"
     NONE = "NONE"
 
 
@@ -72,6 +73,13 @@ class GeoLocation(BaseModel):
     address: Optional[str] = None
 
 
+class BoundingBox(BaseModel):
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
+
+
 class ConfidenceScores(BaseModel):
     plate: float = Field(..., ge=0.0, le=1.0)
     make: float = Field(..., ge=0.0, le=1.0)
@@ -91,10 +99,11 @@ class Incident(BaseModel):
     type: IncidentType
     location: GeoLocation
     camera_id: str
-    detected_at: datetime
+    detected_at: datetime = Field(default_factory=datetime.utcnow)
     cleared_at: Optional[datetime] = None
     confidence: float = Field(..., ge=0.0, le=1.0)
     status: IncidentStatus = IncidentStatus.ACTIVE
+    bounding_box: Optional[BoundingBox] = None
     video_segment: Optional[S3Reference] = None
 
 
@@ -104,9 +113,9 @@ class VehicleIdentification(BaseModel):
     make: str
     model: str
     color: Optional[str] = None
-    location: GeoLocation
+    location: Optional[GeoLocation] = None
     camera_id: str
-    timestamp: datetime
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
     confidence: ConfidenceScores
     image_ref: Optional[S3Reference] = None
 

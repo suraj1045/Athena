@@ -37,34 +37,39 @@ class ANPREngine:
             gpu = self.settings.environment != "dev"
             self._ocr_reader = easyocr.Reader(['en'], gpu=gpu)
 
-    def process(self, image: np.ndarray, camera_id: str) -> VehicleIdentification | None:
+    def process(
+        self,
+        image: np.ndarray,
+        camera_id: str,
+        location: "GeoLocation | None" = None,
+    ) -> VehicleIdentification | None:
         """
         Read license plate from given crop and return vehicle ID entity.
+        Accepts an optional GeoLocation so the result carries camera coordinates.
         """
         self._load_model()
 
         # Step 1: Image Enhancement for OCR
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
+
         # Step 2: EasyOCR inference
         results = self._ocr_reader.readtext(gray)
-        
+
         if not results:
             return None
-            
+
         # Results format: [(bounding_box, text, confidence)]
-        # We take the highest confidence text block
         best_result = max(results, key=lambda x: x[2])
         bbox, text, conf = best_result
-        
-        # Clean up output string (remove spaces and special chars)
+
+        # Clean plate string
         clean_plate = ''.join(e for e in text if e.isalnum()).upper()
-        
+
         if float(conf) < self.settings.anpr_confidence_min or len(clean_plate) < 4:
             return None
 
-        # Step 3: Mock/Placeholder for Make/Model Classification
-        # In the full free tier, you'd load a local PyTorch ResNet model here
+        # Step 3: Placeholder Make/Model classifier
+        # (replace with a real ResNet classifier for production)
         predicted_make = "Toyota"
         predicted_model = "Corolla"
         make_conf = 0.90
@@ -75,11 +80,12 @@ class ANPREngine:
             license_plate=clean_plate,
             make=predicted_make,
             model=predicted_model,
-            color="Silver",  # Placeholder
+            color="Silver",
             camera_id=camera_id,
+            location=location,
             confidence=ConfidenceScores(
                 plate=float(conf),
                 make=make_conf,
-                model=model_conf
-            )
+                model=model_conf,
+            ),
         )

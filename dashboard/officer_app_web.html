@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Athena — Officer App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0D1117;
+            color: #C9D1D9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: #161B22;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .brand {
+            font-size: 18px;
+            font-weight: 800;
+            color: #58A6FF;
+            letter-spacing: 2px;
+        }
+
+        .officer {
+            font-size: 11px;
+            color: #8B949E;
+            margin-top: 2px;
+        }
+
+        .duty-btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .duty-btn.off {
+            background: #3D444D;
+        }
+
+        .stats {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            border-bottom: 1px solid #21262D;
+            background: #161B22;
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center;
+            background: #0D1117;
+            border: 1px solid #21262D;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .stat-val {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: #8B949E;
+            margin-top: 2px;
+            text-transform: uppercase;
+        }
+
+        #map {
+            height: 250px;
+            background: #161B22;
+            border-bottom: 1px solid #21262D;
+        }
+
+        .history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .history-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8B949E;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            background: #161B22;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 4px solid #F85149;
+        }
+
+        .row.ack {
+            border-left-color: #3FB950;
+        }
+
+        .row-meta {
+            font-size: 11px;
+            color: #8B949E;
+            margin-top: 2px;
+        }
+
+        .btn-ack {
+            background: #1F6FEB;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* Modal */
+        #modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #161B22;
+            border: 1px solid #F85149;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 0 40px rgba(248, 81, 73, 0.3);
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .modal-hdr {
+            padding: 16px;
+            border-bottom: 1px solid #21262D;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .modal-body {
+            padding: 20px;
+            text-align: center;
+        }
+
+        .modal-plate {
+            font-size: 32px;
+            font-weight: 800;
+            color: #E6EDF3;
+            letter-spacing: 3px;
+        }
+
+        .grid-3 {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .grid-item {
+            flex: 1;
+            background: #0D1117;
+            border: 1px solid #21262D;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .btn-big-ack {
+            background: #238636;
+            color: white;
+            width: 100%;
+            border: none;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(40px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes flash {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.8;
+                background: #2b0000;
+            }
+        }
+
+        .flashing {
+            animation: flash 0.3s 3;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div>
+            <div class="brand">🏛️ ATHENA</div>
+            <div class="officer">OFF-001 · Officer Rajan</div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div id="ws-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #E3B341"></div>
+            <button id="btn-duty" class="duty-btn" onclick="toggleDuty()">✅ ON DUTY</button>
+        </div>
+    </header>
+
+    <div class="stats">
+        <div class="stat" style="border-color: #F8514944">
+            <div class="stat-val" style="color: #F85149" id="s-act">0</div>
+            <div class="stat-lbl">Active</div>
+        </div>
+        <div class="stat" style="border-color: #3FB95044">
+            <div class="stat-val" style="color: #3FB950" id="s-ack">0</div>
+            <div class="stat-lbl">Ack'd</div>
+        </div>
+        <div class="stat" style="border-color: #58A6FF44">
+            <div class="stat-val" style="color: #58A6FF" id="s-tot">0</div>
+            <div class="stat-lbl">Total</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="history">
+        <div class="history-title">SHIFT ALERTS</div>
+        <div id="list"></div>
+    </div>
+
+    <!-- Intercept Alert Modal -->
+    <div id="modal">
+        <div class="modal-content">
+            <div class="modal-hdr">
+                <div style="font-size: 13px; font-weight: 800; color: #F85149; letter-spacing: 1px;">⚡ INTERCEPT ALERT
+                </div>
+                <div style="color: #8B949E; cursor: pointer; font-size: 20px; line-height: 14px;"
+                    onclick="closeModal()">×</div>
+            </div>
+            <div class="modal-body">
+                <div class="modal-plate" id="m-plate">UP32 AB 1234</div>
+                <div style="font-size: 15px; color: #8B949E; margin-top: 4px;" id="m-model">Toyota Innova</div>
+                <div style="font-size: 14px; font-weight: 600; color: #E3B341; margin-top: 8px;" id="m-viol">HIT AND RUN
+                </div>
+
+                <div class="grid-3">
+                    <div class="grid-item">
+                        <div class="stat-val" style="color: #58A6FF" id="m-dist">150m</div>
+                        <div class="stat-lbl">Dist</div>
+                    </div>
+                    <div class="grid-item">
+                        <div class="stat-val" style="color: #58A6FF" id="m-dir">NE</div>
+                        <div class="stat-lbl">Dir</div>
+                    </div>
+                    <div class="grid-item">
+                        <div class="stat-val" style="color: #58A6FF" id="m-eta">12s</div>
+                        <div class="stat-lbl">ETA</div>
+                    </div>
+                </div>
+
+                <button class="btn-big-ack" onclick="ackModal()">✓ Acknowledge & Intercept</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API = location.hostname === '' ? 'http://localhost:8000' : `${location.protocol}//${location.hostname}:8000`;
+        const OFFICER_ID = 'OFF-001';
+
+        let alerts = [];
+        let onDuty = true;
+        let ws = null;
+        let activeModalAlertId = null;
+
+        // Default location (Bangalore)
+        const loc = { lat: 12.9716, lng: 77.5946, hdg: 0, spd: 0 };
+
+        // Init Map
+        const map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([loc.lat, loc.lng], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
+
+        const currMarker = L.marker([loc.lat, loc.lng], {
+            icon: L.divIcon({ className: '', html: '<div style="font-size:24px">👮</div>', iconSize: [30, 30], iconAnchor: [15, 15] })
+        }).addTo(map);
+
+        let vehicleMarkers = {};
+
+        function toggleDuty() {
+            onDuty = !onDuty;
+            const btn = document.getElementById('btn-duty');
+            btn.className = onDuty ? 'duty-btn' : 'duty-btn off';
+            btn.innerText = onDuty ? '✅ ON DUTY' : '⭕ OFF DUTY';
+            pushLocation();
+        }
+
+        function renderUI() {
+            const active = alerts.filter(a => a.status === 'PENDING').length;
+            document.getElementById('s-act').innerText = active;
+            document.getElementById('s-ack').innerText = alerts.length - active;
+            document.getElementById('s-tot').innerText = alerts.length;
+
+            const list = document.getElementById('list');
+            list.innerHTML = '';
+
+            if (alerts.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#484F58; margin-top:40px; font-size:13px">No alerts this shift</div>';
+            }
+
+            alerts.forEach(a => {
+                const isAck = a.status === 'ACKNOWLEDGED';
+                const row = document.createElement('div');
+                row.className = `row ${isAck ? 'ack' : ''}`;
+                row.innerHTML = `
+          <div style="flex:1">
+            <div style="font-size:15px; font-weight:700; color:#E6EDF3">${a.vehicle_plate}</div>
+            <div class="row-meta">${a.vehicle_make} ${a.vehicle_model} · ${a.violation_type.replace(/_/g, ' ')}</div>
+            <div class="row-meta">${Math.round(a.distance_m)}m ${a.direction} · ~${Math.round(a.estimated_intercept_s)}s ETA</div>
+          </div>
+          ${!isAck
+                        ? `<button class="btn-ack" onclick="ack('${a.id}')">ACK</button>`
+                        : `<div style="color:#3FB950; font-size:12px; font-weight:700">✓ ACK</div>`}
+        `;
+                list.appendChild(row);
+            });
+        }
+
+        function triggerAlert(alert) {
+            // Add to map
+            if (!vehicleMarkers[alert.id]) {
+                vehicleMarkers[alert.id] = L.marker([alert.latitude, alert.longitude], {
+                    icon: L.divIcon({ className: '', html: '<div style="font-size:20px; background:#F8514933; border-radius:50%; width:30px; height:30px; text-align:center; line-height:30px; border:2px solid #F85149">🚗</div>', iconSize: [30, 30], iconAnchor: [15, 15] })
+                }).addTo(map);
+            }
+
+            // Auto pan
+            map.setView([alert.latitude, alert.longitude], 17, { animate: true });
+
+            // Show modal
+            activeModalAlertId = alert.id;
+            document.getElementById('m-plate').innerText = alert.vehicle_plate;
+            document.getElementById('m-model').innerText = `${alert.vehicle_make} ${alert.vehicle_model}`;
+            document.getElementById('m-viol').innerText = alert.violation_type.replace(/_/g, ' ');
+            document.getElementById('m-dist').innerText = `${Math.round(alert.distance_m)}m`;
+            document.getElementById('m-dir').innerText = alert.direction;
+            document.getElementById('m-eta').innerText = `${Math.round(alert.estimated_intercept_s)}s`;
+            document.getElementById('modal').style.display = 'flex';
+
+            // Flash screen
+            document.body.classList.add('flashing');
+            setTimeout(() => document.body.classList.remove('flashing'), 1000);
+
+            // vibrate if supported
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+        }
+
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function ackModal() {
+            if (activeModalAlertId) ack(activeModalAlertId);
+            closeModal();
+        }
+
+        function ack(id) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ACKNOWLEDGE_ALERT', alert_id: id }));
+            }
+            fetch(`${API}/api/v1/alerts/${id}/acknowledge`, { method: 'POST' });
+            const a = alerts.find(x => x.id === id);
+            if (a) { a.status = 'ACKNOWLEDGED'; renderUI(); }
+            if (vehicleMarkers[id]) vehicleMarkers[id].setOpacity(0.5);
+        }
+
+        // Location Loop
+        function pushLocation() {
+            fetch(`${API}/api/v1/officers/${OFFICER_ID}/location`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ latitude: loc.lat, longitude: loc.lng, heading: loc.hdg, speed_mps: loc.spd, on_duty: onDuty })
+            }).catch(() => { });
+        }
+
+        // Simulate slight movement
+        setInterval(() => {
+            if (!onDuty) return;
+            loc.lat += (Math.random() - 0.5) * 0.0001;
+            loc.lng += (Math.random() - 0.5) * 0.0001;
+            currMarker.setLatLng([loc.lat, loc.lng]);
+            pushLocation();
+        }, 5000);
+
+        // WebSocket
+        function connectWS() {
+            ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8000/ws/officer/${OFFICER_ID}`);
+            ws.onopen = () => document.getElementById('ws-dot').style.background = '#3FB950';
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                if (data.type === 'INTERCEPT_ALERT') {
+                    const newAlert = { id: data.alert_id, ...data, status: 'PENDING' };
+                    alerts.unshift(newAlert);
+                    renderUI();
+                    triggerAlert(newAlert);
+                }
+            };
+            ws.onclose = () => {
+                document.getElementById('ws-dot').style.background = '#F85149';
+                setTimeout(connectWS, 3000);
+            };
+        }
+
+        // Initial load
+        fetch(`${API}/api/v1/alerts?officer_id=${OFFICER_ID}&limit=20`)
+            .then(r => r.json())
+            .then(data => { alerts = data; renderUI(); connectWS(); pushLocation(); });
+
+    </script>
+</body>
+
+</html>
