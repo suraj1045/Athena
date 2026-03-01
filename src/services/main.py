@@ -66,13 +66,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @app.on_event("startup")
 async def startup() -> None:
@@ -267,6 +260,18 @@ def update_officer_location(
     record.on_duty = req.on_duty
     record.last_updated = datetime.now(tz=timezone.utc)
     db.commit()
+
+    ws_manager.broadcast_to_control_sync({
+        "type": "OFFICER_LOCATION_UPDATE",
+        "officer_id": officer_id,
+        "latitude": req.latitude,
+        "longitude": req.longitude,
+        "heading": req.heading,
+        "speed_mps": req.speed_mps,
+        "on_duty": req.on_duty,
+        "last_updated": record.last_updated.isoformat(),
+    })
+
     return {"officer_id": officer_id, "status": "updated"}
 
 

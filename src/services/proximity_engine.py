@@ -131,6 +131,22 @@ class ProximityEngine:
                 },
             )
 
+            # Broadcast to control dashboard
+            ws_manager.broadcast_to_control_sync(
+                {
+                    "type": "INTERCEPT_ALERT",
+                    "alert_id": alert.id,
+                    "vehicle_plate": license_plate.upper(),
+                    "vehicle_make": make,
+                    "vehicle_model": model,
+                    "violation_type": violation.violation_type,
+                    "location": {"latitude": latitude, "longitude": longitude},
+                    "distance_m": round(distance, 1),
+                    "direction": _cardinal(bearing_veh_to_officer),
+                    "estimated_intercept_s": round(estimated_intercept_s, 1),
+                }
+            )
+
             logger.info(
                 f"Intercept alert → officer {officer.officer_id}: "
                 f"{license_plate} at {round(distance)}m {_cardinal(bearing_veh_to_officer)}"
