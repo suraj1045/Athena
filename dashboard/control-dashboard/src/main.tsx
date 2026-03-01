@@ -44,6 +44,16 @@ interface InterceptAlert {
   generated_at?: string
 }
 
+interface Officer {
+  officer_id: string
+  latitude: number
+  longitude: number
+  heading: number
+  speed_mps: number
+  on_duty: boolean
+  last_updated: string
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────────
 const API = 'http://localhost:8000'
 const WS_URL = `ws://localhost:8000/ws/control/control-${Math.random().toString(36).slice(2)}`
@@ -94,16 +104,20 @@ const App: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [criticalAlerts, setCriticalAlerts] = useState<CriticalAlert[]>([])
   const [interceptAlerts, setInterceptAlerts] = useState<InterceptAlert[]>([])
+  const [officers, setOfficers] = useState<Officer[]>([])
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const [activeTab, setActiveTab] = useState<'incidents' | 'critical' | 'intercept'>('incidents')
   const wsRef = useRef<WebSocket | null>(null)
 
   // ── Fetch initial data ──────────────────────────────────────────────────────
   useEffect(() => {
-    fetch(`${API}/api/v1/incidents?limit=50`)
-      .then(r => r.json())
-      .then((data: Incident[]) => setIncidents(data))
-      .catch(() => { })
+    Promise.all([
+      fetch(`${API}/api/v1/incidents?limit=50`).then(r => r.json()),
+      fetch(`${API}/api/v1/officers`).then(r => r.json()).catch(() => [])
+    ]).then(([incData, offData]) => {
+      setIncidents(incData)
+      setOfficers(offData)
+    }).catch(() => { })
   }, [])
 
   // ── WebSocket ───────────────────────────────────────────────────────────────
@@ -125,6 +139,16 @@ const App: React.FC = () => {
         setCriticalAlerts(prev => [data as CriticalAlert, ...prev].slice(0, 30))
       } else if (data.type === 'INTERCEPT_ALERT') {
         setInterceptAlerts(prev => [data as InterceptAlert, ...prev].slice(0, 30))
+      } else if (data.type === 'OFFICER_LOCATION_UPDATE') {
+        setOfficers(prev => {
+          const idx = prev.findIndex(o => o.officer_id === data.officer_id)
+          if (idx >= 0) {
+            const next = [...prev]
+            next[idx] = data as Officer
+            return next
+          }
+          return [...prev, data as Officer]
+        })
       }
     }
 
@@ -215,6 +239,20 @@ const App: React.FC = () => {
                     <b style={{ color: '#F85149' }}>🚨 {a.case_type}</b>
                     <div style={{ fontSize: 12 }}>{a.license_plate} — {a.make} {a.model}</div>
                     <div style={{ fontSize: 11, color: '#8B949E' }}>Case: {a.case_number}</div>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+            {officers.map((o) => (
+              <Marker
+                key={`off-${o.officer_id}`}
+                position={[o.latitude, o.longitude]}
+                icon={makeIcon('#58A6FF', 16)}
+              >
+                <Popup>
+                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 8, borderRadius: 6 }}>
+                    <b style={{ color: '#58A6FF' }}>🚔 Officer {o.officer_id}</b>
+                    <div style={{ fontSize: 11, color: '#8B949E', marginTop: 4 }}>Speed: {Math.round(o.speed_mps * 3.6)} km/h</div>
                   </div>
                 </Popup>
               </Marker>

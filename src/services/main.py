@@ -39,6 +39,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -63,6 +64,14 @@ app = FastAPI(
     title="Athena Urban Intelligence — MVP API",
     description="Hackathon prototype: real-time incident detection, vehicle tracking, and proximity alerts.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For MVP hackathon, allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -259,6 +268,18 @@ def update_officer_location(
     record.on_duty = req.on_duty
     record.last_updated = datetime.now(tz=timezone.utc)
     db.commit()
+
+    ws_manager.broadcast_to_control_sync({
+        "type": "OFFICER_LOCATION_UPDATE",
+        "officer_id": officer_id,
+        "latitude": req.latitude,
+        "longitude": req.longitude,
+        "heading": req.heading,
+        "speed_mps": req.speed_mps,
+        "on_duty": req.on_duty,
+        "last_updated": record.last_updated.isoformat(),
+    })
+
     return {"officer_id": officer_id, "status": "updated"}
 
 

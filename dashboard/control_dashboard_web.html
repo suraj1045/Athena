@@ -262,6 +262,7 @@
             incidents: [],
             criticalAlerts: [],
             interceptAlerts: [],
+            officers: [],
             tab: 'incidents',
             markers: {} // id -> leaflet marker
         };
@@ -413,6 +414,15 @@
                 toRender.push([a.location.latitude, a.location.longitude]);
             });
 
+            // Plot officers
+            state.officers.forEach(o => {
+                const m = L.marker([o.latitude, o.longitude], { icon: makeIcon('#58A6FF', 16) })
+                    .bindPopup(`<b>🚔 Officer ${o.officer_id}</b><br><span style="font-size:11px;color:#8B949E">Speed: ${Math.round(o.speed_mps * 3.6)} km/h</span>`);
+                m.addTo(map);
+                state.markers['off_' + o.officer_id] = m;
+                toRender.push([o.latitude, o.longitude]);
+            });
+
             // Auto-fit bounds if we have points
             if (toRender.length > 0) {
                 map.fitBounds(L.latLngBounds(toRender), { padding: [50, 50], maxZoom: 15 });
@@ -443,6 +453,13 @@
                 } else if (data.type === 'INTERCEPT_ALERT') {
                     state.interceptAlerts.unshift(data);
                     if (state.interceptAlerts.length > 30) state.interceptAlerts.pop();
+                } else if (data.type === 'OFFICER_LOCATION_UPDATE') {
+                    const idx = state.officers.findIndex(o => o.officer_id === data.officer_id);
+                    if (idx >= 0) {
+                        state.officers[idx] = data;
+                    } else {
+                        state.officers.push(data);
+                    }
                 }
                 updateUI();
             };
@@ -455,9 +472,15 @@
         }
 
         // Initial load
-        fetch(`${API}/api/v1/incidents?limit=50`)
-            .then(r => r.json())
-            .then(data => { state.incidents = data; updateUI(); connectWS(); });
+        Promise.all([
+            fetch(`${API}/api/v1/incidents?limit=50`).then(r => r.json()),
+            fetch(`${API}/api/v1/officers`).then(r => r.json()).catch(() => [])
+        ]).then(([incData, offData]) => {
+            state.incidents = incData;
+            state.officers = offData;
+            updateUI();
+            connectWS();
+        });
 
     </script>
 </body>
