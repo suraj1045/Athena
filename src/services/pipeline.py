@@ -24,6 +24,7 @@ from src.ml_models.anpr.engine import ANPREngine
 from src.ml_models.yolo_detector.model import YOLODetector
 from src.services.nav_api import nav_client
 from src.services.proximity_engine import proximity_engine
+from src.services.reid_service import reid_service
 from src.services.vehicle_tracker import vehicle_tracker
 from src.services.websocket_manager import ws_manager
 
@@ -174,6 +175,12 @@ class FramePipeline:
             f"Vehicle: {plate} ({identification.make} {identification.model}) "
             f"at {camera_id}"
         )
+
+        # Re-ID: update cross-camera tracking session
+        try:
+            reid_service.record_sighting(db, plate, camera_id, lat, lon)
+        except Exception as exc:
+            logger.warning(f"ReID error ({camera_id}): {exc}")
 
         # Check critical vehicle watchlist
         vehicle_tracker.check_and_record(

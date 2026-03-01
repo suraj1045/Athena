@@ -311,6 +311,9 @@
     </div>
 
     <div id="map"></div>
+    <div style="padding: 4px 12px; background: #161B22; border-bottom: 1px solid #21262D; font-size: 10px; color: #484F58; text-align: center;">
+        Tap map or drag marker to update your location
+    </div>
 
     <div class="history">
         <div class="history-title">SHIFT ALERTS</div>
@@ -390,12 +393,27 @@
         const loc = { lat: 12.9716, lng: 77.5946, hdg: 0, spd: 0 };
 
         // Init Map
-        const map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([loc.lat, loc.lng], 16);
+        const map = L.map('map', { zoomControl: true, dragging: true, scrollWheelZoom: true, tap: true }).setView([loc.lat, loc.lng], 16);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
 
         const currMarker = L.marker([loc.lat, loc.lng], {
+            draggable: true,
             icon: L.divIcon({ className: '', html: '<div style="font-size:24px">👮</div>', iconSize: [30, 30], iconAnchor: [15, 15] })
         }).addTo(map);
+
+        currMarker.on('dragend', () => {
+            const pos = currMarker.getLatLng();
+            loc.lat = pos.lat; loc.lng = pos.lng;
+            pushLocation();
+            showToast('📍 Location updated', '#3FB950');
+        });
+
+        map.on('click', (e) => {
+            loc.lat = e.latlng.lat; loc.lng = e.latlng.lng;
+            currMarker.setLatLng([loc.lat, loc.lng]);
+            pushLocation();
+            showToast('📍 Location updated', '#3FB950');
+        });
 
         let vehicleMarkers = {};
 

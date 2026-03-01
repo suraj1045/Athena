@@ -136,3 +136,35 @@ class InterceptAlertRecord(Base):
     generated_at = Column(DateTime, server_default=func.now())
     acknowledged_at = Column(DateTime, nullable=True)
     status = Column(String, default="PENDING")      # PENDING | ACKNOWLEDGED | EXPIRED
+
+
+# ── Vehicle Tracking (Re-ID / Cross-Camera) ────────────────────────────────────
+
+class VehicleTrackingRecord(Base):
+    __tablename__ = "vehicle_tracking"
+
+    id            = Column(String, primary_key=True, default=_uuid)
+    license_plate = Column(String, nullable=False, index=True)
+    started_at    = Column(DateTime, server_default=func.now())
+    last_seen_at  = Column(DateTime, server_default=func.now())
+    camera_count  = Column(Integer, default=1)      # distinct cameras in this session
+
+    path = relationship(
+        "TrackingSightingRecord",
+        back_populates="track",
+        cascade="all, delete-orphan",
+        order_by="TrackingSightingRecord.timestamp",
+    )
+
+
+class TrackingSightingRecord(Base):
+    __tablename__ = "tracking_sightings"
+
+    id          = Column(String, primary_key=True, default=_uuid)
+    tracking_id = Column(String, ForeignKey("vehicle_tracking.id"), nullable=False, index=True)
+    camera_id   = Column(String, nullable=False)
+    latitude    = Column(Float, nullable=False)
+    longitude   = Column(Float, nullable=False)
+    timestamp   = Column(DateTime, server_default=func.now())
+
+    track = relationship("VehicleTrackingRecord", back_populates="path")

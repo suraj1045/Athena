@@ -49,10 +49,13 @@ from src.database.models import (
     IncidentRecord,
     InterceptAlertRecord,
     OfficerLocationRecord,
+    TrackingSightingRecord,
+    VehicleTrackingRecord,
     ViolationVehicleRecord,
 )
 from src.database.session import Base, SessionLocal, engine, get_db
 from src.services.pipeline import frame_pipeline
+from src.services.reid_service import reid_service
 from src.services.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -493,6 +496,67 @@ def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)) -> Dict[str,
     record.acknowledged_at = datetime.now(tz=timezone.utc)
     db.commit()
     return {"id": alert_id, "status": "ACKNOWLEDGED"}
+
+
+# ── Vehicle Tracking (Re-ID / Cross-Camera) ───────────────────────────────────
+
+@app.get("/api/v1/tracking/{plate}", tags=["Tracking"])
+def get_vehicle_path(plate: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Return the latest active tracking session and full camera path for a plate."""
+    track = (
+        db.query(VehicleTrackingRecord)
+        .filter(VehicleTrackingRecord.license_plate == plate.upper())
+        .order_by(VehicleTrackingRecord.last_seen_at.desc())
+        .first()
+    )
+    if not track:
+        raise HTTPException(status_code=404, detail="No tracking session found for plate")
+    sightings = (
+        db.query(TrackingSightingRecord)
+        .filter(TrackingSightingRecord.tracking_id == track.id)
+        .order_by(TrackingSightingRecord.timestamp)
+        .all()
+    )
+    return {
+        "tracking_id": track.id,
+        "license_plate": track.license_plate,
+        "camera_count": track.camera_count,
+        "started_at": track.started_at.isoformat() if track.started_at else None,
+        "last_seen_at": track.last_seen_at.isoformat() if track.last_seen_at else None,
+        "path": [
+            {
+                "camera_id": s.camera_id,
+                "lat": s.latitude,
+                "lng": s.longitude,
+                "timestamp": s.timestamp.isoformat() if s.timestamp else None,
+            }
+            for s in sightings
+        ],
+    }
+
+
+class SimulateSightingRequest(BaseModel):
+    license_plate: str
+    camera_id: str
+    latitude: float
+    longitude: float
+
+
+@app.post("/api/v1/simulate/sighting", status_code=status.HTTP_202_ACCEPTED, tags=["Simulation"])
+def simulate_sighting(
+    req: SimulateSightingRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Inject a synthetic vehicle sighting for Re-ID / cross-camera tracking demo."""
+    track = reid_service.record_sighting(
+        db, req.license_plate, req.camera_id, req.latitude, req.longitude
+    )
+    return {
+        "status": "accepted",
+        "tracking_id": track.id,
+        "license_plate": track.license_plate,
+        "camera_count": track.camera_count,
+    }
 
 
 # ── WebSocket Endpoints ───────────────────────────────────────────────────────

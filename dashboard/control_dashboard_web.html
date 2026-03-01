@@ -316,8 +316,12 @@
             interceptAlerts: [],
             officers: [],
             tab: 'incidents',
-            markers: {} // id -> leaflet marker
+            markers: {},       // id -> leaflet marker
+            vehiclePaths: {}   // tracking_id -> path data
         };
+
+        // Leaflet layers for vehicle paths (kept so we can clear + redraw)
+        let pathLayers = [];
 
         // Colors
         const COLORS = {
@@ -551,6 +555,12 @@
                     } else {
                         state.officers.push(data);
                     }
+                } else if (data.type === 'VEHICLE_PATH_UPDATE') {
+                    state.vehiclePaths[data.tracking_id] = data;
+                    drawVehiclePaths();
+                    if (data.path && data.path.length >= 2) {
+                        showToast('🗺 Vehicle tracked: ' + data.license_plate + ' across ' + data.camera_count + ' cameras', '#E3B341');
+                    }
                 }
                 updateUI();
             };
@@ -565,6 +575,38 @@
             ws.onerror = () => {
                 banner.style.display = 'block';
             };
+        }
+
+        // Vehicle path polylines (cross-camera tracking)
+        function drawVehiclePaths() {
+            // Clear previous path layers
+            pathLayers.forEach(l => map.removeLayer(l));
+            pathLayers = [];
+
+            Object.values(state.vehiclePaths).forEach(t => {
+                if (!t.path || t.path.length < 2) return;
+                const coords = t.path.map(p => [p.lat, p.lng]);
+
+                // Dashed amber polyline connecting camera sightings
+                const line = L.polyline(coords, {
+                    color: '#E3B341', weight: 3, dashArray: '8,5', opacity: 0.85
+                }).bindTooltip(t.license_plate, { permanent: false }).addTo(map);
+                pathLayers.push(line);
+
+                // Circle markers at each sighting point
+                t.path.forEach((p, i) => {
+                    const dot = L.circleMarker([p.lat, p.lng], {
+                        radius: i === t.path.length - 1 ? 7 : 5,
+                        color: '#E3B341',
+                        fillColor: i === t.path.length - 1 ? '#E3B341' : '#0D1117',
+                        fillOpacity: 0.9,
+                        weight: 2,
+                    }).bindPopup(
+                        `<b>${t.license_plate}</b><br>${p.camera_id}<br><small>${p.timestamp ? new Date(p.timestamp).toLocaleTimeString() : ''}</small>`
+                    ).addTo(map);
+                    pathLayers.push(dot);
+                });
+            });
         }
 
         // Skeleton loader

@@ -7,6 +7,7 @@ without real CCTV feeds. Simulates:
   - Officers moving around the city
   - Violation vehicle intercept alerts
   - Critical vehicle sightings
+  - Cross-camera vehicle tracking (Re-ID path drawn on the dashboard map)
 
 Usage:
   python simulate.py                        # Bangalore, normal speed
@@ -227,7 +228,7 @@ def log(tag: str, msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     colours = {
         "INCIDENT": "\033[91m", "OFFICER": "\033[94m", "INTERCEPT": "\033[93m",
-        "CRITICAL": "\033[95m", "SEED": "\033[92m", "ERROR": "\033[90m",
+        "CRITICAL": "\033[95m", "SEED": "\033[92m", "TRACK": "\033[33m", "ERROR": "\033[90m",
     }
     col = colours.get(tag, "")
     print(f"  {col}[{ts}] [{tag}]\033[0m {msg}")
@@ -355,6 +356,36 @@ def simulate_critical_sighting(city_name: str, city: dict) -> None:
                     f"({vehicle['case_type']}) @ {lat:.4f},{lng:.4f} [{cam}]")
 
 
+# Plates used for cross-camera tracking demo (shared across all cities)
+_TRACKING_STATE: dict = {}   # plate -> {"last_cam": str, "lat": float, "lng": float}
+
+
+def simulate_cross_camera(city_name: str, city: dict) -> None:
+    """
+    Send the same vehicle plate to two different cameras within one tick to
+    demonstrate cross-camera Re-ID and path drawing on the dashboard.
+    """
+    vehicle = random.choice(CRITICAL_VEHICLES)
+    plate = vehicle["license_plate"]
+
+    # Pick two distinct cameras
+    cams = random.sample(city["cameras"], k=min(2, len(city["cameras"])))
+
+    for cam in cams:
+        lat, lng = rand_location(city)
+        payload = {
+            "license_plate": plate,
+            "camera_id": cam,
+            "latitude": lat,
+            "longitude": lng,
+        }
+        result = post("/api/v1/simulate/sighting", payload)
+        if result:
+            log("TRACK", f"[{city_name}] {plate} @ {cam} → session {result.get('tracking_id','')[:8]} "
+                         f"({result.get('camera_count', '?')} cam(s))")
+        time.sleep(0.5)   # small delay so timestamps differ
+
+
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
 def run(city_name: str, city: dict, fast: bool = False) -> None:
@@ -369,6 +400,8 @@ def run(city_name: str, city: dict, fast: bool = False) -> None:
             simulate_officer_movement(city_name, city)
         if tick % 5 == 0:
             simulate_intercept(city_name, city)
+        if tick % 8 == 0:
+            simulate_cross_camera(city_name, city)
         if tick % 10 == 0:
             simulate_critical_sighting(city_name, city)
         time.sleep(10 * scale)
