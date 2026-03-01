@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import requests
 
@@ -49,7 +49,7 @@ class NavAPIClient:
         payload = {
             "event": "INCIDENT_CLEARED",
             "incident_id": incident_id,
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            "timestamp": datetime.now(tz=UTC).isoformat(),
         }
         return self._post_with_retry(payload)
 

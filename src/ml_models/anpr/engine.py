@@ -7,7 +7,7 @@ Replaces SageMaker endpoints with local EasyOCR runs + a placeholder PyTorch cla
 from __future__ import annotations
 
 import logging
-from typing import Any, Tuple
+from typing import Any
 
 import cv2
 import numpy as np
@@ -41,7 +41,7 @@ class ANPREngine:
         self,
         image: np.ndarray,
         camera_id: str,
-        location: "GeoLocation | None" = None,
+        location: GeoLocation | None = None,
     ) -> VehicleIdentification | None:
         """
         Read license plate from given crop and return vehicle ID entity.

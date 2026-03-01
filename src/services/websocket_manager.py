@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict
 
 from fastapi import WebSocket
 
@@ -24,8 +23,8 @@ class ConnectionManager:
     """Central hub for all active WebSocket connections."""
 
     def __init__(self) -> None:
-        self.officer_connections: Dict[str, WebSocket] = {}
-        self.control_connections: Dict[str, WebSocket] = {}
+        self.officer_connections: dict[str, WebSocket] = {}
+        self.control_connections: dict[str, WebSocket] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:

@@ -15,7 +15,6 @@ Algorithm (from design doc §6):
 from __future__ import annotations
 
 import logging
-from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -49,7 +48,7 @@ class ProximityEngine:
         model: str,
         latitude: float,
         longitude: float,
-    ) -> List[InterceptAlertRecord]:
+    ) -> list[InterceptAlertRecord]:
         """
         Checks if vehicle is a violation vehicle, then scans nearby officers.
         Returns list of generated InterceptAlertRecords (may be empty).
@@ -70,7 +69,7 @@ class ProximityEngine:
             .all()
         )
 
-        alerts: List[InterceptAlertRecord] = []
+        alerts: list[InterceptAlertRecord] = []
 
         for officer in officers:
             distance = haversine_distance_m(

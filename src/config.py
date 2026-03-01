@@ -12,11 +12,9 @@ Reference: Agent.md § 1 — THE ARCHITECTURAL CORE (SSoT)
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
-from pydantic import Field, SecretStr
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +53,10 @@ class AthenaSettings(BaseSettings):
     # ── API Server ───────────────────────────────────────────────────────────
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
+
+    # ── Cloud & Deployment ───────────────────────────────────────────────────
+    aws_region: str = Field(default="ap-south-1")
+    data_retention_days: int = Field(default=90)
 
     # ── Database (PostgreSQL) ────────────────────────────────────────────────
     db_user: str = Field(default="athena")
@@ -99,7 +101,7 @@ class AthenaSettings(BaseSettings):
 
 # ─── Singleton accessor ──────────────────────────────────────────────────────
 
-_settings: Optional[AthenaSettings] = None
+_settings: AthenaSettings | None = None
 
 
 def get_settings() -> AthenaSettings:

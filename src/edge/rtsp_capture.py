@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 import cv2
 import requests
@@ -27,11 +26,11 @@ class EdgeRTSPCapture:
         self.camera_id = camera_id
         self.rtsp_url = rtsp_url
         self.logger = logging.getLogger(__name__)
-        
+
         # Point to the local FastAPI ingestion endpoint
         self.api_endpoint = f"http://{self.settings.api_host}:{self.settings.api_port}/api/v1/ingest/frame"
-        
-        self._capture: Optional[cv2.VideoCapture] = None
+
+        self._capture: cv2.VideoCapture | None = None
 
     def start(self) -> None:
         """Begin the capture and transmission loop."""
@@ -66,10 +65,10 @@ class EdgeRTSPCapture:
                         files={"file": ("frame.jpg", buffer.tobytes(), "image/jpeg")},
                         timeout=5.0
                     )
-                    
+
                     if response.status_code != 202:
                         self.logger.error(f"Backend rejected frame: {response.text}")
-                        
+
                 except requests.RequestException as e:
                     self.logger.error(f"Failed to send frame to backend: {e}")
 

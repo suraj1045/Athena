@@ -8,7 +8,6 @@ On match: records sighting to DB and broadcasts alert to control dashboard.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -31,7 +30,7 @@ class VehicleTracker:
         longitude: float,
         camera_id: str,
         confidence: float,
-    ) -> Optional[CriticalVehicleRecord]:
+    ) -> CriticalVehicleRecord | None:
         """
         Returns the matched CriticalVehicleRecord if the plate is on the watchlist
         (and make matches), recording a sighting and broadcasting an alert.

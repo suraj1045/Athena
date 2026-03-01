@@ -58,6 +58,31 @@ interface Officer {
 const API = 'http://localhost:8000'
 const WS_URL = `ws://localhost:8000/ws/control/control-${Math.random().toString(36).slice(2)}`
 
+// Bengaluru city center + bounds
+const BENGALURU_CENTER: [number, number] = [12.9716, 77.5946]
+const BENGALURU_BOUNDS = L.latLngBounds(
+  L.latLng(12.7342, 77.3791), // SW corner
+  L.latLng(13.1726, 77.8415)  // NE corner
+)
+const BENGALURU_ZOOM = 13
+
+// Demo seed data — shown when backend has no data (purely for visual verification)
+const DEMO_OFFICERS: Officer[] = [
+  { officer_id: 'KA-BLR-001', latitude: 12.9719, longitude: 77.5937, heading: 45, speed_mps: 0, on_duty: true, last_updated: new Date().toISOString() },
+  { officer_id: 'KA-BLR-002', latitude: 12.9352, longitude: 77.6245, heading: 135, speed_mps: 4.2, on_duty: true, last_updated: new Date().toISOString() },
+  { officer_id: 'KA-BLR-003', latitude: 13.0079, longitude: 77.5643, heading: 270, speed_mps: 8.3, on_duty: true, last_updated: new Date().toISOString() },
+  { officer_id: 'KA-BLR-004', latitude: 12.9592, longitude: 77.6416, heading: 0, speed_mps: 0, on_duty: true, last_updated: new Date().toISOString() },
+  { officer_id: 'KA-BLR-005', latitude: 12.9698, longitude: 77.7500, heading: 90, speed_mps: 5.6, on_duty: false, last_updated: new Date().toISOString() },
+  { officer_id: 'KA-BLR-006', latitude: 12.9279, longitude: 77.5003, heading: 200, speed_mps: 2.1, on_duty: true, last_updated: new Date().toISOString() },
+]
+
+const DEMO_TRACKED_VEHICLES = [
+  { id: 'tv-1', plate: 'KA 05 MN 1234', make: 'Toyota', model: 'Innova', caseType: 'STOLEN', latitude: 12.9658, longitude: 77.6197, color: '#E3B341' },
+  { id: 'tv-2', plate: 'KA 01 AB 9876', make: 'Honda', model: 'City', caseType: 'HIT_AND_RUN', latitude: 12.9890, longitude: 77.5720, color: '#FF7B72' },
+  { id: 'tv-3', plate: 'KA 19 CD 5555', make: 'Maruti', model: 'Swift', caseType: 'KIDNAPPING', latitude: 12.9445, longitude: 77.6890, color: '#F85149' },
+  { id: 'tv-4', plate: 'KA 03 EF 7777', make: 'Hyundai', model: 'Creta', caseType: 'STOLEN', latitude: 13.0200, longitude: 77.6100, color: '#E3B341' },
+]
+
 const INCIDENT_COLORS: Record<string, string> = {
   STALLED_VEHICLE: '#F0883E',
   BREAKDOWN: '#E3B341',
@@ -71,7 +96,7 @@ const CASE_COLORS: Record<string, string> = {
   STOLEN: '#E3B341',
 }
 
-// ── Leaflet icon fix ──────────────────────────────────────────────────────────
+// ── Icons ──────────────────────────────────────────────────────────────────────
 function makeIcon(color: string, size = 14) {
   return L.divIcon({
     className: '',
@@ -81,14 +106,70 @@ function makeIcon(color: string, size = 14) {
   })
 }
 
-// ── Map auto-fit ──────────────────────────────────────────────────────────────
-function FitBounds({ incidents }: { incidents: Incident[] }) {
+function makeOfficerIcon(onDuty: boolean, heading: number) {
+  const color = onDuty ? '#58A6FF' : '#8B949E'
+  const arrowRotate = heading
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:32px;height:32px;">
+        <div style="
+          position:absolute;inset:0;
+          background:${color};
+          border:2px solid #fff;
+          border-radius:50%;
+          box-shadow:0 0 12px ${color}99;
+          display:flex;align-items:center;justify-content:center;
+          font-size:14px;line-height:1;
+        ">🚔</div>
+        <div style="
+          position:absolute;top:-6px;left:50%;transform:translateX(-50%) rotate(${arrowRotate}deg);
+          width:0;height:0;
+          border-left:5px solid transparent;
+          border-right:5px solid transparent;
+          border-bottom:8px solid ${color};
+          transform-origin:50% 100%;
+        "></div>
+      </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  })
+}
+
+function makeVehicleIcon(color: string) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="
+          position:absolute;inset:4px;
+          background:#0D1117;
+          border:2px solid ${color};
+          border-radius:6px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:15px;
+          box-shadow:0 0 14px ${color}99;
+        ">🚗</div>
+        <div style="
+          position:absolute;inset:-2px;
+          border:2px solid ${color};
+          border-radius:10px;
+          animation:vehiclePulse 1.5s ease-in-out infinite;
+          opacity:0.5;
+        "></div>
+      </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  })
+}
+
+// ── Map helpers ────────────────────────────────────────────────────────────────
+function BengaluruMapSetup() {
   const map = useMap()
   useEffect(() => {
-    if (incidents.length === 0) return
-    const bounds = L.latLngBounds(incidents.map(i => [i.latitude, i.longitude]))
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 })
-  }, [incidents.length])
+    map.setMaxBounds(BENGALURU_BOUNDS)
+    map.setMinZoom(10)
+  }, [])
   return null
 }
 
@@ -106,8 +187,22 @@ const App: React.FC = () => {
   const [interceptAlerts, setInterceptAlerts] = useState<InterceptAlert[]>([])
   const [officers, setOfficers] = useState<Officer[]>([])
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
-  const [activeTab, setActiveTab] = useState<'incidents' | 'critical' | 'intercept'>('incidents')
+  const [activeTab, setActiveTab] = useState<'incidents' | 'critical' | 'intercept' | 'vehicles'>('incidents')
   const wsRef = useRef<WebSocket | null>(null)
+
+  // Build tracked vehicle list from critical alerts + demo data
+  const trackedVehicles = criticalAlerts.length > 0
+    ? criticalAlerts.map(a => ({
+      id: `crit-${a.vehicle_id}`,
+      plate: a.license_plate,
+      make: a.make,
+      model: a.model,
+      caseType: a.case_type,
+      latitude: a.location.latitude,
+      longitude: a.location.longitude,
+      color: CASE_COLORS[a.case_type] || '#F85149',
+    }))
+    : DEMO_TRACKED_VEHICLES
 
   // ── Fetch initial data ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -116,8 +211,11 @@ const App: React.FC = () => {
       fetch(`${API}/api/v1/officers`).then(r => r.json()).catch(() => [])
     ]).then(([incData, offData]) => {
       setIncidents(incData)
-      setOfficers(offData)
-    }).catch(() => { })
+      // Use demo officers if backend returns empty list
+      setOfficers(Array.isArray(offData) && offData.length > 0 ? offData : DEMO_OFFICERS)
+    }).catch(() => {
+      setOfficers(DEMO_OFFICERS)
+    })
   }, [])
 
   // ── WebSocket ───────────────────────────────────────────────────────────────
@@ -191,32 +289,46 @@ const App: React.FC = () => {
 
         {/* ── Map ── */}
         <div style={{ flex: 1, position: 'relative' }}>
+          <style>{`
+            @keyframes vehiclePulse {
+              0%,100% { opacity:0.5; transform:scale(1); }
+              50%      { opacity:0.1; transform:scale(1.5); }
+            }
+          `}</style>
           <MapContainer
-            center={[20.5937, 78.9629]}
-            zoom={5}
+            center={BENGALURU_CENTER}
+            zoom={BENGALURU_ZOOM}
             style={{ width: '100%', height: '100%' }}
-            zoomControl={false}
+            zoomControl={true}
+            maxBounds={BENGALURU_BOUNDS}
+            maxBoundsViscosity={1.0}
           >
+            {/* @ts-ignore */}
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Bengaluru Police Command'
+              maxZoom={19}
             />
+            {/* @ts-ignore */}
+            <BengaluruMapSetup />
+
+            {/* @ts-ignore */}
             {incidents.map(inc => (
               <Marker
                 key={inc.id}
                 position={[inc.latitude, inc.longitude]}
                 icon={makeIcon(
-                  inc.status === 'CLEARED' ? '#3D444D' : (INCIDENT_COLORS[inc.incident_type || inc.type || ''] || '#58A6FF'),
+                  inc.status === 'CLEARED' ? '#3D444D' : (INCIDENT_COLORS[(inc.incident_type || inc.type || '')] || '#58A6FF'),
                   inc.status === 'ACTIVE' ? 16 : 10
                 )}
               >
                 <Popup>
-                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 8, borderRadius: 6, minWidth: 180 }}>
-                    <b style={{ color: INCIDENT_COLORS[inc.incident_type || inc.type || ''] || '#58A6FF' }}>
+                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 8, borderRadius: 6, minWidth: 190 }}>
+                    <b style={{ color: INCIDENT_COLORS[(inc.incident_type || inc.type || '')] || '#58A6FF' }}>
                       {incidentLabel(inc)}
                     </b>
-                    <div style={{ fontSize: 11, marginTop: 4, color: '#8B949E' }}>Camera: {inc.camera_id}</div>
-                    <div style={{ fontSize: 11, color: '#8B949E' }}>Conf: {(inc.confidence * 100).toFixed(0)}%</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: '#8B949E' }}>📷 {inc.camera_id}</div>
+                    <div style={{ fontSize: 11, color: '#8B949E' }}>Conf: {((inc.confidence || 0) * 100).toFixed(0)}%</div>
                     <div style={{ fontSize: 11, color: '#8B949E' }}>{inc.detected_at ? fmtTime(inc.detected_at) : ''}</div>
                     {inc.status === 'ACTIVE' && (
                       <button onClick={() => clearIncident(inc.id)}
@@ -228,46 +340,76 @@ const App: React.FC = () => {
                 </Popup>
               </Marker>
             ))}
-            {criticalAlerts.map((a, i) => (
+
+            {/* @ts-ignore */}
+            {trackedVehicles.map(v => (
               <Marker
-                key={`c-${i}`}
-                position={[a.location.latitude, a.location.longitude]}
-                icon={makeIcon(CASE_COLORS[a.case_type] || '#F85149', 18)}
+                key={v.id}
+                position={[v.latitude, v.longitude]}
+                icon={makeVehicleIcon(v.color)}
               >
                 <Popup>
-                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 8, borderRadius: 6 }}>
-                    <b style={{ color: '#F85149' }}>🚨 {a.case_type}</b>
-                    <div style={{ fontSize: 12 }}>{a.license_plate} — {a.make} {a.model}</div>
-                    <div style={{ fontSize: 11, color: '#8B949E' }}>Case: {a.case_number}</div>
+                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 10, borderRadius: 6, minWidth: 200 }}>
+                    <b style={{ color: v.color }}>🚗 TRACKED VEHICLE</b>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#E6EDF3', marginTop: 4 }}>{v.plate}</div>
+                    <div style={{ fontSize: 11, color: '#8B949E' }}>{v.make} {v.model}</div>
+                    <div style={{ fontSize: 11, marginTop: 4 }}>
+                      <span style={{ color: v.color, background: v.color + '22', padding: '2px 6px', borderRadius: 8 }}>
+                        {v.caseType.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#F85149', fontWeight: 600 }}>⚠ INTERCEPT REQUIRED</div>
                   </div>
                 </Popup>
               </Marker>
             ))}
-            {officers.map((o) => (
+
+            {/* @ts-ignore */}
+            {officers.map(o => (
               <Marker
                 key={`off-${o.officer_id}`}
                 position={[o.latitude, o.longitude]}
-                icon={makeIcon('#58A6FF', 16)}
+                icon={makeOfficerIcon(o.on_duty, o.heading ?? 0)}
               >
                 <Popup>
-                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 8, borderRadius: 6 }}>
-                    <b style={{ color: '#58A6FF' }}>🚔 Officer {o.officer_id}</b>
-                    <div style={{ fontSize: 11, color: '#8B949E', marginTop: 4 }}>Speed: {Math.round(o.speed_mps * 3.6)} km/h</div>
+                  <div style={{ background: '#161B22', color: '#C9D1D9', padding: 10, borderRadius: 6, minWidth: 190 }}>
+                    <b style={{ color: o.on_duty ? '#58A6FF' : '#8B949E' }}>🚔 Officer {o.officer_id}</b>
+                    <div style={{ fontSize: 11, color: '#8B949E', marginTop: 4 }}>
+                      Status: <span style={{ color: o.on_duty ? '#3FB950' : '#F85149' }}>{o.on_duty ? 'ON DUTY' : 'OFF DUTY'}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#8B949E' }}>Speed: {Math.round((o.speed_mps ?? 0) * 3.6)} km/h</div>
+                    <div style={{ fontSize: 11, color: '#8B949E' }}>Heading: {o.heading ?? 0}°</div>
+                    <div style={{ fontSize: 10, color: '#484F58', marginTop: 4 }}>{o.last_updated ? fmtTime(o.last_updated) : ''}</div>
                   </div>
                 </Popup>
               </Marker>
             ))}
-            {activeIncidents.length > 0 && <FitBounds incidents={activeIncidents} />}
           </MapContainer>
 
           {/* Map legend */}
-          <div style={{ position: 'absolute', bottom: 12, left: 12, background: '#161B22CC', border: '1px solid #21262D', borderRadius: 8, padding: '8px 12px', zIndex: 1000, fontSize: 11 }}>
+          <div style={{ position: 'absolute', bottom: 12, left: 12, background: '#161B22EE', border: '1px solid #21262D', borderRadius: 8, padding: '10px 14px', zIndex: 1000, fontSize: 11, minWidth: 170 }}>
+            <div style={{ fontWeight: 700, color: '#E6EDF3', marginBottom: 6, fontSize: 12 }}>📍 Bengaluru Command</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 14 }}>🚔</span>
+              <span style={{ color: '#58A6FF' }}>Police Officer</span>
+              <span style={{ color: '#484F58', marginLeft: 'auto' }}>{officers.filter(o => o.on_duty).length} active</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 14 }}>🚗</span>
+              <span style={{ color: '#E3B341' }}>Tracked Vehicle</span>
+              <span style={{ color: '#484F58', marginLeft: 'auto' }}>{trackedVehicles.length}</span>
+            </div>
             {Object.entries(INCIDENT_COLORS).map(([k, v]) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: v }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: v, flexShrink: 0 }} />
                 <span style={{ color: '#8B949E' }}>{k.replace(/_/g, ' ')}</span>
               </div>
             ))}
+          </div>
+
+          {/* City label */}
+          <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: '#161B22CC', border: '1px solid #30363D', borderRadius: 20, padding: '4px 14px', zIndex: 1000, fontSize: 11, color: '#8B949E', pointerEvents: 'none' }}>
+            🏙️ Bengaluru City — Live Surveillance
           </div>
         </div>
 
@@ -276,19 +418,34 @@ const App: React.FC = () => {
 
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid #21262D', flexShrink: 0 }}>
-            {([['incidents', '🚦 Incidents'], ['critical', '🚨 Critical'], ['intercept', '⚡ Intercept']] as const).map(([tab, label]) => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                style={{ flex: 1, padding: '10px 4px', background: activeTab === tab ? '#0D1117' : 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid #58A6FF' : '2px solid transparent', color: activeTab === tab ? '#E6EDF3' : '#8B949E', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', fontWeight: activeTab === tab ? 600 : 400 }}>
+            {([
+              ['incidents', '🚦 Incidents', incidents.filter(i => i.status === 'ACTIVE').length],
+              ['critical', '🚨 Critical', criticalAlerts.length],
+              ['intercept', '⚡ Intercept', interceptAlerts.length],
+              ['vehicles', '🚗 Tracked', trackedVehicles.length],
+            ] as const).map(([tab, label, count]) => (
+              <button key={tab} onClick={() => setActiveTab(tab as any)}
+                style={{ flex: 1, padding: '10px 2px', background: activeTab === tab ? '#0D1117' : 'transparent', border: 'none', borderBottom: activeTab === tab ? '2px solid #58A6FF' : '2px solid transparent', color: activeTab === tab ? '#E6EDF3' : '#8B949E', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit', fontWeight: activeTab === tab ? 600 : 400 }}>
                 {label}
-                <span style={{ marginLeft: 4, fontSize: 10, background: '#21262D', borderRadius: 10, padding: '1px 5px' }}>
-                  {tab === 'incidents' ? incidents.filter(i => i.status === 'ACTIVE').length : tab === 'critical' ? criticalAlerts.length : interceptAlerts.length}
-                </span>
+                <span style={{ marginLeft: 3, fontSize: 10, background: '#21262D', borderRadius: 10, padding: '1px 5px' }}>{count}</span>
               </button>
             ))}
           </div>
 
+          {/* Officers bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#0D1117', borderBottom: '1px solid #21262D', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: '#8B949E' }}>🚔 Officers:</span>
+            {officers.slice(0, 6).map(o => (
+              <span key={o.officer_id} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: o.on_duty ? '#58A6FF22' : '#21262D', color: o.on_duty ? '#58A6FF' : '#484F58', border: `1px solid ${o.on_duty ? '#58A6FF44' : '#30363D'}` }}>
+                {o.officer_id.split('-').pop()}
+              </span>
+            ))}
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#3FB950' }}>{officers.filter(o => o.on_duty).length} on duty</span>
+          </div>
+
           {/* Tab content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+            {activeTab === 'incidents' && incidents.length === 0 && <EmptyState label="No incidents detected" />}
             {activeTab === 'incidents' && incidents.map(inc => (
               <IncidentCard key={inc.id} inc={inc} onClear={clearIncident} />
             ))}
@@ -299,6 +456,9 @@ const App: React.FC = () => {
             {activeTab === 'intercept' && interceptAlerts.length === 0 && <EmptyState label="No intercept alerts" />}
             {activeTab === 'intercept' && interceptAlerts.map((a, i) => (
               <InterceptCard key={i} alert={a} />
+            ))}
+            {activeTab === 'vehicles' && trackedVehicles.map(v => (
+              <TrackedVehicleCard key={v.id} vehicle={v} />
             ))}
           </div>
         </div>
@@ -371,6 +531,22 @@ const CriticalCard: React.FC<{ alert: CriticalAlert }> = ({ alert }) => {
     </div>
   )
 }
+
+const TrackedVehicleCard: React.FC<{ vehicle: typeof DEMO_TRACKED_VEHICLES[0] }> = ({ vehicle }) => (
+  <div style={{ background: '#0D1117', border: `1px solid ${vehicle.color}44`, borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: vehicle.color, background: vehicle.color + '22', padding: '2px 7px', borderRadius: 10 }}>
+          🚗 {vehicle.caseType.replace(/_/g, ' ')}
+        </span>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#E6EDF3', marginTop: 4 }}>{vehicle.plate}</div>
+        <div style={{ fontSize: 11, color: '#8B949E' }}>{vehicle.make} {vehicle.model}</div>
+        <div style={{ fontSize: 11, color: '#8B949E', marginTop: 2 }}>📍 {vehicle.latitude.toFixed(4)}, {vehicle.longitude.toFixed(4)}</div>
+      </div>
+      <span style={{ fontSize: 10, padding: '2px 7px', background: '#F8514922', color: '#F85149', borderRadius: 10, border: '1px solid #F8514944', whiteSpace: 'nowrap' }}>⚠ INTERCEPT</span>
+    </div>
+  </div>
+)
 
 const InterceptCard: React.FC<{ alert: InterceptAlert }> = ({ alert }) => (
   <div style={{ background: '#0D1117', border: '1px solid #58A6FF44', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>

@@ -1,0 +1,12 @@
+﻿
+> athena-control-dashboard@1.0.0 typecheck
+> tsc --noEmit
+
+src/main.tsx(306,13): error TS2322: Type 'Element' is not assignable to type 'string'.
+src/main.tsx(311,13): error TS2322: Type 'Element' is not assignable to type 'string'.
+src/main.tsx(313,13): error TS2322: Type 'Element[]' is not assignable to type 'string'.
+src/main.tsx(314,13): error TS2322: Type 'Element[]' is not assignable to type 'string'.
+src/main.tsx(342,13): error TS2322: Type 'Element[]' is not assignable to type 'string'.
+src/main.tsx(343,13): error TS2322: Type 'Element[]' is not assignable to type 'string'.
+src/main.tsx(365,13): error TS2322: Type 'undefined' is not assignable to type 'string'.
+src/main.tsx(366,13): error TS2322: Type 'Element[]' is not assignable to type 'string'.

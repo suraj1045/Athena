@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from src.common.logger import get_logger
 
@@ -28,7 +27,7 @@ class ANPRTrainingConfig:
     classifier_epochs: int = 30
     batch_size: int = 32
     learning_rate: float = 0.001
-    pretrained_backbone: Optional[str] = "resnet50"
+    pretrained_backbone: str | None = "resnet50"
 
 
 def train_plate_detector(config: ANPRTrainingConfig) -> Path:

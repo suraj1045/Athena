@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import uvicorn
 from fastapi import (
@@ -114,7 +114,7 @@ class UpdateOfficerLocationRequest(BaseModel):
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["System"])
-async def health() -> Dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok", "environment": settings.environment.value}
 
 
@@ -127,7 +127,7 @@ async def ingest_frame(
     longitude: float = Query(..., ge=-180, le=180),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     file: UploadFile = File(...),
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Accepts a JPEG frame from an edge camera.
     Runs YOLO + ANPR pipeline in a background thread.
@@ -145,7 +145,7 @@ async def ingest_frame(
 def register_critical_vehicle(
     req: RegisterCriticalVehicleRequest,
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Register a vehicle on the critical tracking watchlist."""
     record = CriticalVehicleRecord(
         license_plate=req.license_plate.upper(),
@@ -167,7 +167,7 @@ def register_critical_vehicle(
 @app.get("/api/v1/vehicles/critical", tags=["Watchlist"])
 def list_critical_vehicles(
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return all active entries from the critical vehicle watchlist."""
     records = (
         db.query(CriticalVehicleRecord)
@@ -195,7 +195,7 @@ def list_critical_vehicles(
 @app.patch("/api/v1/vehicles/critical/{vehicle_id}/deactivate", tags=["Watchlist"])
 def deactivate_critical_vehicle(
     vehicle_id: str, db: Session = Depends(get_db)
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Remove a vehicle from active tracking."""
     record = db.query(CriticalVehicleRecord).filter_by(id=vehicle_id).first()
     if not record:
@@ -210,7 +210,7 @@ def deactivate_critical_vehicle(
 @app.post("/api/v1/violations/vehicle", status_code=status.HTTP_201_CREATED, tags=["Violations"])
 def add_violation_vehicle(
     req: AddViolationVehicleRequest, db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Add a vehicle to the violation database (triggers proximity alerts when detected)."""
     existing = (
         db.query(ViolationVehicleRecord)
@@ -231,7 +231,7 @@ def add_violation_vehicle(
 
 
 @app.get("/api/v1/violations/vehicle", tags=["Violations"])
-def list_violation_vehicles(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+def list_violation_vehicles(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     records = db.query(ViolationVehicleRecord).all()
     return [
         {
@@ -252,7 +252,7 @@ def update_officer_location(
     officer_id: str,
     req: UpdateOfficerLocationRequest,
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Upsert an officer's GPS location, heading, and duty status.
     Called frequently by the Officer App (every 5-10 seconds).
@@ -266,7 +266,7 @@ def update_officer_location(
     record.heading = req.heading
     record.speed_mps = req.speed_mps
     record.on_duty = req.on_duty
-    record.last_updated = datetime.now(tz=timezone.utc)
+    record.last_updated = datetime.now(tz=UTC)
     db.commit()
 
     ws_manager.broadcast_to_control_sync({
@@ -284,7 +284,7 @@ def update_officer_location(
 
 
 @app.get("/api/v1/officers", tags=["Officers"])
-def list_officers(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+def list_officers(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     records = db.query(OfficerLocationRecord).filter_by(on_duty=True).all()
     return [
         {
@@ -304,10 +304,10 @@ def list_officers(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
 
 @app.get("/api/v1/incidents", tags=["Incidents"])
 def list_incidents(
-    status_filter: Optional[str] = Query(None, alias="status"),
+    status_filter: str | None = Query(None, alias="status"),
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     q = db.query(IncidentRecord)
     if status_filter:
         q = q.filter(IncidentRecord.status == status_filter.upper())
@@ -329,13 +329,13 @@ def list_incidents(
 
 
 @app.post("/api/v1/incidents/{incident_id}/clear", tags=["Incidents"])
-def clear_incident(incident_id: str, db: Session = Depends(get_db)) -> Dict[str, str]:
+def clear_incident(incident_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
     """Mark an incident as cleared and notify the Navigation API."""
     record = db.query(IncidentRecord).filter_by(id=incident_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Incident not found")
     record.status = "CLEARED"
-    record.cleared_at = datetime.now(tz=timezone.utc)
+    record.cleared_at = datetime.now(tz=UTC)
     db.commit()
 
     # Best-effort Nav API clear notification
@@ -358,10 +358,10 @@ def clear_incident(incident_id: str, db: Session = Depends(get_db)) -> Dict[str,
 
 @app.get("/api/v1/alerts", tags=["Alerts"])
 def list_alerts(
-    officer_id: Optional[str] = Query(None),
+    officer_id: str | None = Query(None),
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     q = db.query(InterceptAlertRecord)
     if officer_id:
         q = q.filter(InterceptAlertRecord.officer_id == officer_id)
@@ -388,12 +388,12 @@ def list_alerts(
 
 
 @app.post("/api/v1/alerts/{alert_id}/acknowledge", tags=["Alerts"])
-def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)) -> Dict[str, str]:
+def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
     record = db.query(InterceptAlertRecord).filter_by(id=alert_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Alert not found")
     record.status = "ACKNOWLEDGED"
-    record.acknowledged_at = datetime.now(tz=timezone.utc)
+    record.acknowledged_at = datetime.now(tz=UTC)
     db.commit()
     return {"id": alert_id, "status": "ACKNOWLEDGED"}
 
@@ -418,7 +418,7 @@ async def officer_websocket(websocket: WebSocket, officer_id: str) -> None:
                     record = db.query(InterceptAlertRecord).filter_by(id=alert_id).first()
                     if record:
                         record.status = "ACKNOWLEDGED"
-                        record.acknowledged_at = datetime.now(tz=timezone.utc)
+                        record.acknowledged_at = datetime.now(tz=UTC)
                         db.commit()
     except WebSocketDisconnect:
         ws_manager.disconnect_officer(officer_id)

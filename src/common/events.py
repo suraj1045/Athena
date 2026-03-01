@@ -8,7 +8,6 @@ These form the canonical contract between microservices.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -32,7 +31,7 @@ class BaseEvent(BaseModel):
 class StreamConnectedEvent(BaseEvent):
     event_type: str = "StreamConnected"
     camera_id: str
-    stream_quality: Optional[str] = None
+    stream_quality: str | None = None
 
 
 class StreamDisconnectedEvent(BaseEvent):

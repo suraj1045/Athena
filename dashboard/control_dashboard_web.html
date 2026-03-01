@@ -206,6 +206,20 @@
                 opacity: 1;
             }
         }
+
+        @keyframes vehiclePulse {
+
+            0%,
+            100% {
+                opacity: 0.6;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.1;
+                transform: scale(1.6);
+            }
+        }
     </style>
 </head>
 
@@ -264,8 +278,34 @@
             interceptAlerts: [],
             officers: [],
             tab: 'incidents',
-            markers: {} // id -> leaflet marker
+            markers: {}
         };
+
+        // Bengaluru city center & bounds
+        const BENGALURU_CENTER = [12.9716, 77.5946];
+        const BENGALURU_ZOOM = 13;
+        const BENGALURU_BOUNDS = L.latLngBounds(
+            L.latLng(12.7342, 77.3791),
+            L.latLng(13.1726, 77.8415)
+        );
+
+        // Demo officers — used if backend returns no officers
+        const DEMO_OFFICERS = [
+            { officer_id: 'KA-BLR-001', latitude: 12.9719, longitude: 77.5937, heading: 45, speed_mps: 0, on_duty: true, last_updated: new Date().toISOString() },
+            { officer_id: 'KA-BLR-002', latitude: 12.9352, longitude: 77.6245, heading: 135, speed_mps: 4.2, on_duty: true, last_updated: new Date().toISOString() },
+            { officer_id: 'KA-BLR-003', latitude: 13.0079, longitude: 77.5643, heading: 270, speed_mps: 8.3, on_duty: true, last_updated: new Date().toISOString() },
+            { officer_id: 'KA-BLR-004', latitude: 12.9592, longitude: 77.6416, heading: 0, speed_mps: 0, on_duty: true, last_updated: new Date().toISOString() },
+            { officer_id: 'KA-BLR-005', latitude: 12.9698, longitude: 77.7500, heading: 90, speed_mps: 5.6, on_duty: false, last_updated: new Date().toISOString() },
+            { officer_id: 'KA-BLR-006', latitude: 12.9279, longitude: 77.5003, heading: 200, speed_mps: 2.1, on_duty: true, last_updated: new Date().toISOString() },
+        ];
+
+        // Demo tracked vehicles
+        const DEMO_TRACKED_VEHICLES = [
+            { id: 'tv-1', plate: 'KA 05 MN 1234', make: 'Toyota', model: 'Innova', caseType: 'STOLEN', latitude: 12.9658, longitude: 77.6197, color: '#E3B341' },
+            { id: 'tv-2', plate: 'KA 01 AB 9876', make: 'Honda', model: 'City', caseType: 'HIT_AND_RUN', latitude: 12.9890, longitude: 77.5720, color: '#FF7B72' },
+            { id: 'tv-3', plate: 'KA 19 CD 5555', make: 'Maruti', model: 'Swift', caseType: 'KIDNAPPING', latitude: 12.9445, longitude: 77.6890, color: '#F85149' },
+            { id: 'tv-4', plate: 'KA 03 EF 7777', make: 'Hyundai', model: 'Creta', caseType: 'STOLEN', latitude: 13.0200, longitude: 77.6100, color: '#E3B341' },
+        ];
 
         // Colors
         const COLORS = {
@@ -279,11 +319,26 @@
             DEFAULT: '#58A6FF'
         };
 
-        // Init Map
-        const map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
+        // Init Map — Bengaluru only
+        const map = L.map('map', { zoomControl: true }).setView(BENGALURU_CENTER, BENGALURU_ZOOM);
+        map.setMaxBounds(BENGALURU_BOUNDS);
+        map.setMinZoom(10);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            attribution: '© OpenStreetMap | Bengaluru Police Command',
+            maxZoom: 19
         }).addTo(map);
+
+        // City label
+        const cityLabel = L.control({ position: 'topcenter' });
+        const cityDiv = document.createElement('div');
+        cityDiv.innerHTML = '🏙️ Bengaluru City — Live Surveillance';
+        cityDiv.style.cssText = 'background:#161B22CC;border:1px solid #30363D;border-radius:20px;padding:4px 14px;font-size:11px;color:#8B949E;pointer-events:none;margin-top:8px;font-family:Inter,sans-serif';
+        document.getElementById('map').appendChild(cityDiv);
+        cityDiv.style.position = 'absolute';
+        cityDiv.style.top = '12px';
+        cityDiv.style.left = '50%';
+        cityDiv.style.transform = 'translateX(-50%)';
+        cityDiv.style.zIndex = '999';
 
         function makeIcon(color, size = 14) {
             return L.divIcon({
@@ -291,6 +346,35 @@
                 html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 0 10px ${color}"></div>`,
                 iconSize: [size, size],
                 iconAnchor: [size / 2, size / 2]
+            });
+        }
+
+        function makeOfficerIcon(onDuty, heading) {
+            const color = onDuty ? '#58A6FF' : '#8B949E';
+            return L.divIcon({
+                className: '',
+                html: `
+                  <div style="position:relative;width:32px;height:32px;">
+                    <div style="position:absolute;inset:0;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 0 12px ${color}99;display:flex;align-items:center;justify-content:center;font-size:14px">🚔</div>
+                    <div style="position:absolute;top:-6px;left:50%;width:0;height:0;
+                      border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid ${color};
+                      transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 100%;"></div>
+                  </div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        }
+
+        function makeVehicleIcon(color) {
+            return L.divIcon({
+                className: '',
+                html: `
+                  <div style="position:relative;width:36px;height:36px;">
+                    <div style="position:absolute;inset:4px;background:#0D1117;border:2px solid ${color};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 0 14px ${color}99">🚗</div>
+                    <div style="position:absolute;inset:-2px;border:2px solid ${color};border-radius:10px;animation:vehiclePulse 1.5s ease-in-out infinite"></div>
+                  </div>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
             });
         }
 
@@ -392,7 +476,30 @@
             Object.values(state.markers).forEach(m => map.removeLayer(m));
             state.markers = {};
 
-            const toRender = [];
+            // Tracked vehicles (from critical alerts or demo data)
+            const trackedVehicles = state.criticalAlerts.length > 0
+                ? state.criticalAlerts.map(a => ({
+                    id: 'crit-' + a.vehicle_id,
+                    plate: a.license_plate, make: a.make, model: a.model,
+                    caseType: a.case_type,
+                    latitude: a.location.latitude, longitude: a.location.longitude,
+                    color: COLORS[a.case_type] || COLORS.DEFAULT
+                }))
+                : DEMO_TRACKED_VEHICLES;
+
+            trackedVehicles.forEach(v => {
+                const m = L.marker([v.latitude, v.longitude], { icon: makeVehicleIcon(v.color) })
+                    .bindPopup(`
+                      <div style="background:#161B22;color:#C9D1D9;padding:10px;border-radius:6px;min-width:200px">
+                        <b style="color:${v.color}">🚗 TRACKED VEHICLE</b>
+                        <div style="font-size:14px;font-weight:700;color:#E6EDF3;margin-top:4px">${v.plate}</div>
+                        <div style="font-size:11px;color:#8B949E">${v.make} ${v.model}</div>
+                        <div style="margin-top:4px"><span style="color:${v.color};background:${v.color}22;padding:2px 6px;border-radius:8px;font-size:11px">${v.caseType.replace(/_/g, ' ')}</span></div>
+                        <div style="margin-top:8px;font-size:11px;color:#F85149;font-weight:600">⚠ INTERCEPT REQUIRED</div>
+                      </div>`);
+                m.addTo(map);
+                state.markers['tv_' + v.id] = m;
+            });
 
             // Plot active incidents
             state.incidents.filter(i => i.status === 'ACTIVE').forEach(inc => {
@@ -401,32 +508,22 @@
                     .bindPopup(`<b style="color:${c}">${inc.type.replace(/_/g, ' ')}</b><br><span style="font-size:11px;color:#8B949E">Camera: ${inc.camera_id}</span><br><br><button onclick="clearIncident('${inc.id}')" style="background:#238636;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer">Clear Incident</button>`);
                 m.addTo(map);
                 state.markers['inc_' + inc.id] = m;
-                toRender.push([inc.latitude, inc.longitude]);
             });
 
-            // Plot criticals
-            state.criticalAlerts.forEach(a => {
-                const c = COLORS[a.case_type] || COLORS.DEFAULT;
-                const m = L.marker([a.location.latitude, a.location.longitude], { icon: makeIcon(c, 20) })
-                    .bindPopup(`<b>🚨 ${a.case_type}</b><br>${a.license_plate}<br><span style="font-size:11px;color:#8B949E">Case: ${a.case_number}</span>`);
-                m.addTo(map);
-                state.markers['crit_' + a.vehicle_id] = m;
-                toRender.push([a.location.latitude, a.location.longitude]);
-            });
-
-            // Plot officers
-            state.officers.forEach(o => {
-                const m = L.marker([o.latitude, o.longitude], { icon: makeIcon('#58A6FF', 16) })
-                    .bindPopup(`<b>🚔 Officer ${o.officer_id}</b><br><span style="font-size:11px;color:#8B949E">Speed: ${Math.round(o.speed_mps * 3.6)} km/h</span>`);
+            // Plot officers with badge icons
+            const officersToShow = state.officers.length > 0 ? state.officers : DEMO_OFFICERS;
+            officersToShow.forEach(o => {
+                const m = L.marker([o.latitude, o.longitude], { icon: makeOfficerIcon(o.on_duty, o.heading || 0) })
+                    .bindPopup(`
+                      <div style="background:#161B22;color:#C9D1D9;padding:10px;border-radius:6px;min-width:190px">
+                        <b style="color:${o.on_duty ? '#58A6FF' : '#8B949E'}">🚔 Officer ${o.officer_id}</b>
+                        <div style="font-size:11px;color:#8B949E;margin-top:4px">Status: <span style="color:${o.on_duty ? '#3FB950' : '#F85149'}">${o.on_duty ? 'ON DUTY' : 'OFF DUTY'}</span></div>
+                        <div style="font-size:11px;color:#8B949E">Speed: ${Math.round((o.speed_mps || 0) * 3.6)} km/h</div>
+                        <div style="font-size:11px;color:#8B949E">Heading: ${o.heading || 0}°</div>
+                      </div>`);
                 m.addTo(map);
                 state.markers['off_' + o.officer_id] = m;
-                toRender.push([o.latitude, o.longitude]);
             });
-
-            // Auto-fit bounds if we have points
-            if (toRender.length > 0) {
-                map.fitBounds(L.latLngBounds(toRender), { padding: [50, 50], maxZoom: 15 });
-            }
         }
 
         // WebSocket logic
@@ -477,7 +574,11 @@
             fetch(`${API}/api/v1/officers`).then(r => r.json()).catch(() => [])
         ]).then(([incData, offData]) => {
             state.incidents = incData;
-            state.officers = offData;
+            state.officers = (Array.isArray(offData) && offData.length > 0) ? offData : DEMO_OFFICERS;
+            updateUI();
+            connectWS();
+        }).catch(() => {
+            state.officers = DEMO_OFFICERS;
             updateUI();
             connectWS();
         });

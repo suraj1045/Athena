@@ -11,7 +11,6 @@ The WebSocket manager's sync-safe methods handle cross-thread alert delivery.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -31,8 +30,8 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # ── Lazy-loaded ML models (expensive to initialise, share across calls) ────────
-_yolo: Optional[YOLODetector] = None
-_anpr: Optional[ANPREngine] = None
+_yolo: YOLODetector | None = None
+_anpr: ANPREngine | None = None
 
 
 def _get_yolo() -> YOLODetector:
@@ -200,7 +199,7 @@ class FramePipeline:
     # ── Utilities ─────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _decode(frame_bytes: bytes) -> Optional[np.ndarray]:
+    def _decode(frame_bytes: bytes) -> np.ndarray | None:
         try:
             arr = np.frombuffer(frame_bytes, dtype=np.uint8)
             return cv2.imdecode(arr, cv2.IMREAD_COLOR)

@@ -11,7 +11,6 @@ and escalates to SageMaker only when the local confidence threshold is met.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -26,7 +25,7 @@ settings = get_settings()
 class LocalDetection:
     """Result of the on-device anomaly check."""
     anomaly_detected: bool
-    anomaly_type: Optional[str] = None  # "MOTION_STOP" | "SUDDEN_DENSITY"
+    anomaly_type: str | None = None  # "MOTION_STOP" | "SUDDEN_DENSITY"
     confidence: float = 0.0
     should_escalate: bool = False
 
@@ -40,7 +39,7 @@ class EdgeAnomalyDetector:
     def __init__(self, motion_threshold: float = 0.02, stall_frames: int = 5) -> None:
         self._motion_threshold = motion_threshold
         self._stall_frames = stall_frames
-        self._prev_frame: Optional[np.ndarray] = None
+        self._prev_frame: np.ndarray | None = None
         self._consecutive_still: int = 0
 
     def analyze(self, frame: np.ndarray) -> LocalDetection:

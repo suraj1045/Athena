@@ -8,7 +8,7 @@ Each function targets O(n) or better efficiency (Agent.md § 2).
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def haversine_distance_m(
@@ -64,4 +64,4 @@ def is_approaching(
 
 def utc_now() -> datetime:
     """Return the current UTC datetime (timezone-aware)."""
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)

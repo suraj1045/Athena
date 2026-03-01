@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from src.common.logger import get_logger
 
@@ -29,7 +28,7 @@ class TrainingConfig:
     batch_size: int = 16
     img_size: int = 640
     learning_rate: float = 0.01
-    pretrained_weights: Optional[str] = "yolov8n.pt"
+    pretrained_weights: str | None = "yolov8n.pt"
     device: str = "cuda:0"
 
 

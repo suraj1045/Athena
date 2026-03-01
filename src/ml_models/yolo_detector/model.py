@@ -10,7 +10,7 @@ Reference: Agent.md § 2 (Performance First) — local VRAM usage.
 from __future__ import annotations
 
 import logging
-from typing import Any, List
+from typing import Any
 
 import numpy as np
 
@@ -20,7 +20,7 @@ try:
 except ImportError:
     YOLO = Any
 
-from src.common.schemas import BoundingBox, ConfidenceScores, GeoLocation, Incident, IncidentType
+from src.common.schemas import BoundingBox, GeoLocation, Incident, IncidentType
 from src.config import get_settings
 
 
@@ -41,21 +41,21 @@ class YOLODetector:
             # Send to GPU if available, else CPU
             self._model.to('cuda' if self.settings.environment != "dev" else 'cpu')
 
-    def detect(self, frame: np.ndarray, camera_id: str, location: GeoLocation) -> List[Incident]:
+    def detect(self, frame: np.ndarray, camera_id: str, location: GeoLocation) -> list[Incident]:
         """
         Run inference on a single frame and return a list of Incidents.
         """
         self._load_model()
-        
+
         # YOLOv8 returns a list of Results objects
         results = self._model(
-            frame, 
-            conf=self.settings.detection_confidence_min, 
+            frame,
+            conf=self.settings.detection_confidence_min,
             verbose=False
         )
-        
-        incidents: List[Incident] = []
-        
+
+        incidents: list[Incident] = []
+
         for result in results:
             boxes = result.boxes
             for box in boxes:
@@ -64,15 +64,15 @@ class YOLODetector:
                 # box.cls: class ID
                 conf = float(box.conf[0])
                 cls_id = int(box.cls[0])
-                
+
                 # We map class IDs to our domain 'IncidentType'.
                 # E.g., class 0 might be person, 2 car, etc in COCO
                 incident_type = self._map_class_to_incident(cls_id)
                 if incident_type is None:
                     continue
-                    
+
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                
+
                 incident = Incident(
                     type=incident_type,
                     location=location,
@@ -86,7 +86,7 @@ class YOLODetector:
                     )
                 )
                 incidents.append(incident)
-                
+
         return incidents
 
     def _map_class_to_incident(self, class_id: int) -> IncidentType | None:

@@ -9,11 +9,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +68,7 @@ class AlertStatus(str, Enum):
 class GeoLocation(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
-    address: Optional[str] = None
+    address: str | None = None
 
 
 class BoundingBox(BaseModel):
@@ -89,7 +87,7 @@ class ConfidenceScores(BaseModel):
 class S3Reference(BaseModel):
     s3_bucket: str
     s3_key: str
-    duration_s: Optional[float] = None
+    duration_s: float | None = None
 
 
 # ─── Domain Models ────────────────────────────────────────────────────────────
@@ -100,11 +98,11 @@ class Incident(BaseModel):
     location: GeoLocation
     camera_id: str
     detected_at: datetime = Field(default_factory=datetime.utcnow)
-    cleared_at: Optional[datetime] = None
+    cleared_at: datetime | None = None
     confidence: float = Field(..., ge=0.0, le=1.0)
     status: IncidentStatus = IncidentStatus.ACTIVE
-    bounding_box: Optional[BoundingBox] = None
-    video_segment: Optional[S3Reference] = None
+    bounding_box: BoundingBox | None = None
+    video_segment: S3Reference | None = None
 
 
 class VehicleIdentification(BaseModel):
@@ -112,12 +110,12 @@ class VehicleIdentification(BaseModel):
     license_plate: str
     make: str
     model: str
-    color: Optional[str] = None
-    location: Optional[GeoLocation] = None
+    color: str | None = None
+    location: GeoLocation | None = None
     camera_id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     confidence: ConfidenceScores
-    image_ref: Optional[S3Reference] = None
+    image_ref: S3Reference | None = None
 
 
 class CriticalVehicle(BaseModel):
@@ -162,5 +160,5 @@ class InterceptAlert(BaseModel):
     direction: str
     estimated_intercept_s: float
     generated_at: datetime
-    acknowledged_at: Optional[datetime] = None
+    acknowledged_at: datetime | None = None
     status: AlertStatus = AlertStatus.PENDING
