@@ -34,6 +34,7 @@ class IncidentRecord(Base):
     cleared_at = Column(DateTime, nullable=True)
     confidence = Column(Float, nullable=False)
     status = Column(String, default="ACTIVE")       # ACTIVE | CLEARED
+    city = Column(String, nullable=True, index=True)
 
 
 # ── Vehicle Identifications ────────────────────────────────────────────────────

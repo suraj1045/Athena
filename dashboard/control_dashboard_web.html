@@ -194,22 +194,52 @@
         }
 
         @keyframes pulse {
-            0% {
-                opacity: 1;
-            }
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
 
-            50% {
-                opacity: 0.4;
-            }
+        /* Skeleton loaders */
+        .skeleton-card {
+            background: #161B22;
+            border: 1px solid #21262D;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .skeleton-line {
+            height: 12px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #21262D 25%, #30363D 50%, #21262D 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
 
-            100% {
-                opacity: 1;
-            }
+        /* WS disconnection banner */
+        #ws-banner {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: #F85149;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 9998;
         }
     </style>
 </head>
 
 <body>
+
+    <div id="ws-banner">⚠ Live connection lost — reconnecting...</div>
 
     <header>
         <div style="display: flex; align-items: center; gap: 12px;">
@@ -218,6 +248,11 @@
                 <div class="brand">ATHENA</div>
                 <div style="font-size: 11px; color: #8B949E;">Control Dashboard</div>
             </div>
+            <select id="city-select" onchange="changeCity(this.value)" style="
+                background: #0D1117; color: #E6EDF3; border: 1px solid #30363D;
+                border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+                cursor: pointer; margin-left: 8px;">
+            </select>
         </div>
         <div class="stats">
             <div class="stat">
@@ -253,9 +288,26 @@
         </div>
     </div>
 
+    <div id="toast-container" style="position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:9999;pointer-events:none;"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const API = location.hostname === '' ? 'http://localhost:8000' : `${location.protocol}//${location.hostname}:8000`;
+
+        // ── Indian Cities ──────────────────────────────────────────────────────
+        const CITIES = {
+            'Bangalore':  { lat: 12.9716, lng: 77.5946, cameras: ['CAM-MG-ROAD', 'CAM-INDIRANAGAR', 'CAM-KORAMANGALA', 'CAM-WHITEFIELD', 'CAM-JAYANAGAR'] },
+            'Mumbai':     { lat: 19.0760, lng: 72.8777, cameras: ['CAM-MARINE-DRIVE', 'CAM-BANDRA', 'CAM-ANDHERI', 'CAM-KURLA', 'CAM-COLABA'] },
+            'Delhi':      { lat: 28.6139, lng: 77.2090, cameras: ['CAM-CP', 'CAM-KAROL-BAGH', 'CAM-LAJPAT-NAGAR', 'CAM-ROHINI', 'CAM-DWARKA'] },
+            'Chennai':    { lat: 13.0827, lng: 80.2707, cameras: ['CAM-ANNA-NAGAR', 'CAM-T-NAGAR', 'CAM-ADYAR', 'CAM-VELACHERY', 'CAM-PORUR'] },
+            'Hyderabad':  { lat: 17.3850, lng: 78.4867, cameras: ['CAM-HITECH-CITY', 'CAM-BANJARA-HILLS', 'CAM-SECUNDERABAD', 'CAM-LB-NAGAR', 'CAM-KUKATPALLY'] },
+            'Kolkata':    { lat: 22.5726, lng: 88.3639, cameras: ['CAM-PARK-STREET', 'CAM-HOWRAH', 'CAM-SALT-LAKE', 'CAM-ESPLANADE', 'CAM-NEW-TOWN'] },
+            'Pune':       { lat: 18.5204, lng: 73.8567, cameras: ['CAM-KOREGAON-PARK', 'CAM-HINJEWADI', 'CAM-SHIVAJINAGAR', 'CAM-KOTHRUD', 'CAM-HADAPSAR'] },
+            'Ahmedabad':  { lat: 23.0225, lng: 72.5714, cameras: ['CAM-SG-HIGHWAY', 'CAM-CG-ROAD', 'CAM-NAVRANGPURA', 'CAM-BODAKDEV', 'CAM-MANINAGAR'] },
+            'Jaipur':     { lat: 26.9124, lng: 75.7873, cameras: ['CAM-MI-ROAD', 'CAM-VAISHALI-NAGAR', 'CAM-MALVIYA-NAGAR', 'CAM-TONK-ROAD', 'CAM-MANSAROVAR'] },
+            'Kochi':      { lat:  9.9312, lng: 76.2673, cameras: ['CAM-MG-ROAD-KOCHI', 'CAM-EDAPPALLY', 'CAM-KAKKANAD', 'CAM-FORT-KOCHI', 'CAM-ALUVA'] },
+        };
+        let selectedCity = 'Bangalore';
 
         // State
         const state = {
@@ -419,30 +471,69 @@
             }
         }
 
+        // City selector
+        function changeCity(name) {
+            selectedCity = name;
+            const c = CITIES[name];
+            map.setView([c.lat, c.lng], 13, { animate: true });
+            state.incidents = []; state.criticalAlerts = []; state.interceptAlerts = [];
+            updateUI();
+            fetch(`${API}/api/v1/incidents?limit=50&city=${encodeURIComponent(name)}`)
+                .then(r => r.json())
+                .then(data => { state.incidents = data; updateUI(); });
+        }
+
+        // Toast notifications
+        function showToast(message, color = '#58A6FF') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: #161B22; border: 1px solid ${color}44;
+                color: #E6EDF3; padding: 10px 16px; border-radius: 8px;
+                font-size: 13px; font-weight: 500; pointer-events: auto;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                border-left: 3px solid ${color};
+                transition: opacity 0.3s; opacity: 1; max-width: 280px;
+            `;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
+            while (container.children.length > 3) container.firstChild.remove();
+        }
+
         // WebSocket logic
         function connectWS() {
             const badge = document.getElementById('ws-badge');
+            const banner = document.getElementById('ws-banner');
             const ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8000/ws/control/web-${Math.floor(Math.random() * 1000)}`);
 
             ws.onopen = () => {
                 badge.style.color = '#3FB950'; badge.style.borderColor = '#3FB95044'; badge.style.backgroundColor = '#3FB95011';
                 badge.innerHTML = '<div class="dot" style="background:#3FB950; animation: pulse 2s infinite"></div> CONNECTED';
+                banner.style.display = 'none';
             };
 
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
                 if (data.type === 'INCIDENT_DETECTED') {
-                    state.incidents.unshift(data);
-                    if (state.incidents.length > 100) state.incidents.pop();
+                    const city = data.data?.city;
+                    if (!city || city === selectedCity) {
+                        state.incidents.unshift(data);
+                        if (state.incidents.length > 100) state.incidents.pop();
+                        showToast('🔴 New incident: ' + (data.data?.type || '').replace(/_/g, ' '), '#F85149');
+                    }
                 } else if (data.type === 'INCIDENT_CLEARED') {
                     const inc = state.incidents.find(i => i.id === data.incident_id);
                     if (inc) inc.status = 'CLEARED';
+                    showToast('✅ Incident cleared', '#3FB950');
                 } else if (data.type === 'CRITICAL_VEHICLE_DETECTED') {
                     state.criticalAlerts.unshift(data);
                     if (state.criticalAlerts.length > 30) state.criticalAlerts.pop();
+                    showToast('🚨 Critical vehicle: ' + (data.data?.license_plate || ''), '#FF7B72');
                 } else if (data.type === 'INTERCEPT_ALERT') {
                     state.interceptAlerts.unshift(data);
                     if (state.interceptAlerts.length > 30) state.interceptAlerts.pop();
+                    showToast('⚡ Intercept alert issued', '#58A6FF');
                 }
                 updateUI();
             };
@@ -450,12 +541,42 @@
             ws.onclose = () => {
                 badge.style.color = '#F85149'; badge.style.borderColor = '#F8514944'; badge.style.backgroundColor = '#F8514911';
                 badge.innerHTML = '<div class="dot" style="background:#F85149"></div> DISCONNECTED';
+                banner.style.display = 'block';
                 setTimeout(connectWS, 3000);
+            };
+
+            ws.onerror = () => {
+                banner.style.display = 'block';
             };
         }
 
+        // Skeleton loader
+        function showSkeleton() {
+            const list = document.getElementById('list');
+            list.innerHTML = [1, 2, 3].map(() => `
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:40%"></div>
+                    <div class="skeleton-line" style="width:70%"></div>
+                    <div class="skeleton-line" style="width:55%"></div>
+                </div>
+            `).join('');
+        }
+
+        // Populate city dropdown and set initial map view
+        (function initCities() {
+            const sel = document.getElementById('city-select');
+            Object.keys(CITIES).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name; opt.text = name;
+                if (name === selectedCity) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            map.setView([CITIES[selectedCity].lat, CITIES[selectedCity].lng], 13);
+        })();
+
         // Initial load
-        fetch(`${API}/api/v1/incidents?limit=50`)
+        showSkeleton();
+        fetch(`${API}/api/v1/incidents?limit=50&city=${encodeURIComponent(selectedCity)}`)
             .then(r => r.json())
             .then(data => { state.incidents = data; updateUI(); connectWS(); });
 

@@ -39,6 +39,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -63,6 +64,13 @@ app = FastAPI(
     title="Athena Urban Intelligence — MVP API",
     description="Hackathon prototype: real-time incident detection, vehicle tracking, and proximity alerts.",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -284,12 +292,15 @@ def list_officers(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
 @app.get("/api/v1/incidents", tags=["Incidents"])
 def list_incidents(
     status_filter: Optional[str] = Query(None, alias="status"),
+    city: Optional[str] = Query(None),
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     q = db.query(IncidentRecord)
     if status_filter:
         q = q.filter(IncidentRecord.status == status_filter.upper())
+    if city:
+        q = q.filter(IncidentRecord.city == city)
     records = q.order_by(IncidentRecord.detected_at.desc()).limit(limit).all()
     return [
         {
@@ -300,6 +311,7 @@ def list_incidents(
             "camera_id": r.camera_id,
             "confidence": r.confidence,
             "status": r.status,
+            "city": r.city,
             "detected_at": r.detected_at.isoformat() if r.detected_at else None,
             "cleared_at": r.cleared_at.isoformat() if r.cleared_at else None,
         }
@@ -331,6 +343,107 @@ def clear_incident(incident_id: str, db: Session = Depends(get_db)) -> Dict[str,
         "cleared_at": record.cleared_at.isoformat(),
     })
     return {"id": incident_id, "status": "CLEARED"}
+
+
+# ── Simulation Endpoints (for demo/testing without real camera feeds) ─────────
+
+class SimulateIncidentRequest(BaseModel):
+    type: str = "STALLED_VEHICLE"
+    latitude: float
+    longitude: float
+    camera_id: str = "SIM-CAM-01"
+    confidence: float = 0.91
+    city: Optional[str] = None
+
+
+class SimulateInterceptRequest(BaseModel):
+    officer_id: str = "OFF-001"
+    vehicle_plate: str
+    vehicle_make: str = "Toyota"
+    vehicle_model: str = "Innova"
+    violation_type: str = "EXPIRED_PERMIT"
+    latitude: float
+    longitude: float
+    distance_m: float = 320.0
+    direction: str = "NE"
+    estimated_intercept_s: float = 45.0
+
+
+@app.post("/api/v1/simulate/incident", status_code=status.HTTP_201_CREATED, tags=["Simulation"])
+def simulate_incident(
+    req: SimulateIncidentRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Inject a synthetic incident directly — bypasses ML pipeline. For demo/testing only."""
+    record = IncidentRecord(
+        type=req.type,
+        latitude=req.latitude,
+        longitude=req.longitude,
+        camera_id=req.camera_id,
+        confidence=req.confidence,
+        status="ACTIVE",
+        city=req.city,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    ws_manager.broadcast_to_control_sync({
+        "type": "INCIDENT_DETECTED",
+        "id": record.id,
+        "data": {
+            "type": record.type,
+            "latitude": record.latitude,
+            "longitude": record.longitude,
+            "camera_id": record.camera_id,
+            "confidence": record.confidence,
+            "status": record.status,
+            "city": record.city,
+            "detected_at": record.detected_at.isoformat() if record.detected_at else None,
+        },
+    })
+    return {"id": record.id, "type": record.type, "status": "ACTIVE"}
+
+
+@app.post("/api/v1/simulate/intercept", status_code=status.HTTP_201_CREATED, tags=["Simulation"])
+def simulate_intercept(
+    req: SimulateInterceptRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Inject a synthetic intercept alert — bypasses proximity engine. For demo/testing only."""
+    record = InterceptAlertRecord(
+        officer_id=req.officer_id,
+        vehicle_plate=req.vehicle_plate,
+        vehicle_make=req.vehicle_make,
+        vehicle_model=req.vehicle_model,
+        violation_type=req.violation_type,
+        latitude=req.latitude,
+        longitude=req.longitude,
+        distance_m=req.distance_m,
+        direction=req.direction,
+        estimated_intercept_s=req.estimated_intercept_s,
+        status="PENDING",
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    alert_payload = {
+        "type": "INTERCEPT_ALERT",
+        "alert_id": record.id,
+        "officer_id": record.officer_id,
+        "vehicle_plate": record.vehicle_plate,
+        "vehicle_make": record.vehicle_make,
+        "vehicle_model": record.vehicle_model,
+        "violation_type": record.violation_type,
+        "latitude": record.latitude,
+        "longitude": record.longitude,
+        "distance_m": record.distance_m,
+        "direction": record.direction,
+        "estimated_intercept_s": record.estimated_intercept_s,
+        "status": record.status,
+    }
+    ws_manager.broadcast_to_control_sync(alert_payload)
+    ws_manager.send_to_officer_sync(req.officer_id, alert_payload)
+    return {"id": record.id, "officer_id": record.officer_id, "status": "PENDING"}
 
 
 # ── Intercept Alerts ──────────────────────────────────────────────────────────

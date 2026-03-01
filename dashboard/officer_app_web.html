@@ -237,15 +237,57 @@
         .flashing {
             animation: flash 0.3s 3;
         }
+
+        /* Skeleton loaders */
+        .skeleton-card {
+            background: #161B22;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 8px;
+            border-left: 4px solid #21262D;
+        }
+        .skeleton-line {
+            height: 12px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #21262D 25%, #30363D 50%, #21262D 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            margin-bottom: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* WS disconnection banner */
+        #ws-banner {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: #F85149;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 9998;
+        }
     </style>
 </head>
 
 <body>
 
+    <div id="ws-banner">⚠ Live connection lost — reconnecting...</div>
+
     <header>
         <div>
             <div class="brand">🏛️ ATHENA</div>
             <div class="officer">OFF-001 · Officer Rajan</div>
+            <select id="city-select" onchange="changeCity(this.value)" style="
+                background: #0D1117; color: #8B949E; border: 1px solid #21262D;
+                border-radius: 4px; padding: 3px 6px; font-size: 10px; font-weight: 600;
+                cursor: pointer; margin-top: 4px; width: 100%;">
+            </select>
         </div>
         <div style="display: flex; gap: 12px; align-items: center;">
             <div id="ws-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #E3B341"></div>
@@ -310,10 +352,34 @@
         </div>
     </div>
 
+    <div id="toast-container" style="position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:9999;pointer-events:none;"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const API = location.hostname === '' ? 'http://localhost:8000' : `${location.protocol}//${location.hostname}:8000`;
         const OFFICER_ID = 'OFF-001';
+
+        // ── Indian Cities ──────────────────────────────────────────────────────
+        const CITIES = {
+            'Bangalore':  { lat: 12.9716, lng: 77.5946 },
+            'Mumbai':     { lat: 19.0760, lng: 72.8777 },
+            'Delhi':      { lat: 28.6139, lng: 77.2090 },
+            'Chennai':    { lat: 13.0827, lng: 80.2707 },
+            'Hyderabad':  { lat: 17.3850, lng: 78.4867 },
+            'Kolkata':    { lat: 22.5726, lng: 88.3639 },
+            'Pune':       { lat: 18.5204, lng: 73.8567 },
+            'Ahmedabad':  { lat: 23.0225, lng: 72.5714 },
+            'Jaipur':     { lat: 26.9124, lng: 75.7873 },
+            'Kochi':      { lat:  9.9312, lng: 76.2673 },
+        };
+
+        function changeCity(name) {
+            const c = CITIES[name];
+            loc.lat = c.lat; loc.lng = c.lng;
+            map.setView([c.lat, c.lng], 16, { animate: true });
+            currMarker.setLatLng([loc.lat, loc.lng]);
+            pushLocation();
+        }
 
         let alerts = [];
         let onDuty = true;
@@ -436,10 +502,33 @@
             pushLocation();
         }, 5000);
 
+        // Toast notifications
+        function showToast(message, color = '#58A6FF') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                background: #161B22; border: 1px solid ${color}44;
+                color: #E6EDF3; padding: 10px 16px; border-radius: 8px;
+                font-size: 13px; font-weight: 500; pointer-events: auto;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                border-left: 3px solid ${color};
+                transition: opacity 0.3s; opacity: 1; max-width: 280px;
+            `;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
+            while (container.children.length > 3) container.firstChild.remove();
+        }
+
         // WebSocket
         function connectWS() {
+            const dot = document.getElementById('ws-dot');
+            const banner = document.getElementById('ws-banner');
             ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8000/ws/officer/${OFFICER_ID}`);
-            ws.onopen = () => document.getElementById('ws-dot').style.background = '#3FB950';
+            ws.onopen = () => {
+                dot.style.background = '#3FB950';
+                banner.style.display = 'none';
+            };
             ws.onmessage = (e) => {
                 const data = JSON.parse(e.data);
                 if (data.type === 'INTERCEPT_ALERT') {
@@ -447,15 +536,44 @@
                     alerts.unshift(newAlert);
                     renderUI();
                     triggerAlert(newAlert);
+                    showToast('⚡ Intercept: ' + data.vehicle_plate, '#F85149');
                 }
             };
             ws.onclose = () => {
-                document.getElementById('ws-dot').style.background = '#F85149';
+                dot.style.background = '#F85149';
+                banner.style.display = 'block';
                 setTimeout(connectWS, 3000);
+            };
+            ws.onerror = () => {
+                banner.style.display = 'block';
             };
         }
 
+        // Populate city dropdown
+        (function initCities() {
+            const sel = document.getElementById('city-select');
+            Object.keys(CITIES).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name; opt.text = name;
+                if (name === 'Bangalore') opt.selected = true;
+                sel.appendChild(opt);
+            });
+        })();
+
+        // Skeleton loader
+        function showSkeleton() {
+            const list = document.getElementById('list');
+            list.innerHTML = [1, 2].map(() => `
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:35%"></div>
+                    <div class="skeleton-line" style="width:65%"></div>
+                    <div class="skeleton-line" style="width:50%"></div>
+                </div>
+            `).join('');
+        }
+
         // Initial load
+        showSkeleton();
         fetch(`${API}/api/v1/alerts?officer_id=${OFFICER_ID}&limit=20`)
             .then(r => r.json())
             .then(data => { alerts = data; renderUI(); connectWS(); pushLocation(); });
