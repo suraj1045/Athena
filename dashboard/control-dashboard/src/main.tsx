@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -188,6 +188,7 @@ const App: React.FC = () => {
   const [officers, setOfficers] = useState<Officer[]>([])
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
   const [activeTab, setActiveTab] = useState<'incidents' | 'critical' | 'intercept' | 'vehicles'>('incidents')
+  const [predictedRoutes, setPredictedRoutes] = useState<Record<string, { lat: number; lng: number }[]>>({})
   const wsRef = useRef<WebSocket | null>(null)
 
   // Build tracked vehicle list from critical alerts + demo data
@@ -258,6 +259,23 @@ const App: React.FC = () => {
 
   useEffect(() => { connectWs(); return () => wsRef.current?.close() }, [])
 
+  // ── Route Prediction ────────────────────────────────────────────────────────
+  useEffect(() => {
+    trackedVehicles.forEach(v => {
+      // Only predict for non-demo vehicles (IDs starting with 'crit-')
+      if (v.id.startsWith('crit-') && !predictedRoutes[v.id]) {
+        const vehicleId = v.id.replace('crit-', '')
+        fetch(`${API}/api/v1/vehicles/critical/${vehicleId}/predicted-route`)
+          .then(r => r.json())
+          .then(coords => {
+            if (Array.isArray(coords) && coords.length > 0) {
+              setPredictedRoutes(prev => ({ ...prev, [v.id]: coords }))
+            }
+          }).catch(err => console.error('Prediction fetch error:', err))
+      }
+    })
+  }, [trackedVehicles, predictedRoutes])
+
   // ── Clear incident ──────────────────────────────────────────────────────────
   const clearIncident = async (id: string) => {
     await fetch(`${API}/api/v1/incidents/${id}/clear`, { method: 'POST' })
@@ -303,6 +321,20 @@ const App: React.FC = () => {
             maxBounds={BENGALURU_BOUNDS}
             maxBoundsViscosity={1.0}
           >
+            {/* @ts-ignore */}
+            {Object.entries(predictedRoutes).map(([vid, coords]) => {
+              const vehicle = trackedVehicles.find(v => v.id === vid)
+              return (
+                <Polyline
+                  key={`route-${vid}`}
+                  positions={coords.map(c => [c.lat, c.lng] as [number, number])}
+                  color={vehicle?.color || '#58A6FF'}
+                  dashArray="10, 10"
+                  weight={3}
+                  opacity={0.7}
+                />
+              )
+            })}
             {/* @ts-ignore */}
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

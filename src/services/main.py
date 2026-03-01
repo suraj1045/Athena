@@ -49,11 +49,13 @@ from src.database.models import (
     IncidentRecord,
     InterceptAlertRecord,
     OfficerLocationRecord,
+    VehicleSightingRecord,
     ViolationVehicleRecord,
 )
 from src.database.session import Base, SessionLocal, engine, get_db
 from src.services.pipeline import frame_pipeline
 from src.services.websocket_manager import ws_manager
+from src.services.route_predictor import route_predictor
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -398,6 +400,24 @@ def acknowledge_alert(alert_id: str, db: Session = Depends(get_db)) -> dict[str,
     return {"id": alert_id, "status": "ACKNOWLEDGED"}
 
 
+# ── Route Prediction ──────────────────────────────────────────────────────────
+
+@app.get("/api/v1/vehicles/critical/{vehicle_id}/predicted-route", tags=["Watchlist"])
+def get_predicted_route(
+    vehicle_id: str,
+    minutes: int = Query(5, ge=1, le=30),
+    db: Session = Depends(get_db)
+) -> list[dict[str, float]]:
+    """
+    Returns a list of {lat, lng} coordinates representing the predicted 
+    future path of a critical vehicle.
+    """
+    route = route_predictor.predict_route(db, vehicle_id, prediction_minutes=minutes)
+    if not route:
+        return []
+    return route
+
+
 # ── WebSocket Endpoints ───────────────────────────────────────────────────────
 
 @app.websocket("/ws/officer/{officer_id}")
@@ -441,6 +461,30 @@ async def control_websocket(websocket: WebSocket, client_id: str) -> None:
     except WebSocketDisconnect:
         ws_manager.disconnect_control(client_id)
         logger.info(f"Control client {client_id} disconnected")
+
+
+# ── Testing / Simulation ──────────────────────────────────────────────────────
+
+@app.post("/api/v1/test/simulate-sighting", tags=["Testing"])
+def simulate_sighting(
+    vehicle_id: str,
+    latitude: float,
+    longitude: float,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Helper for simulation: adds a sighting for a vehicle."""
+    sighting = VehicleSightingRecord(
+        vehicle_id=vehicle_id,
+        camera_id="SIM-CAM",
+        latitude=latitude,
+        longitude=longitude,
+        timestamp=datetime.now(tz=UTC),
+        confidence=1.0,
+    )
+    db.add(sighting)
+    db.commit()
+    logger.info(f"Simulated sighting added for vehicle {vehicle_id}")
+    return {"status": "recorded", "vehicle_id": vehicle_id}
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

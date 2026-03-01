@@ -1,99 +1,107 @@
-# Athena Project — Execution Guide (Windows)
+# 🏛️ Athena — Full Feature Execution Guide (Windows)
 
-Follow these steps to set up and run the Athena Urban Intelligence platform on your local machine.
-
-## 1. Prerequisites
-Ensure you have the following installed:
-- **Docker Desktop**: For running PostgreSQL, Redis, and MinIO.
-- **Python 3.11+**: For the backend and AI logic.
-- **Node.js & npm**: For the React control dashboard.
+This guide walks you through setting up and running **all** features of the Athena platform, including real-time incident detection, critical vehicle tracking, officer dispatch, and the new **Route Prediction** engine.
 
 ---
 
-## 2. Infrastructure Setup
-Start the local FOSS services (Postgres, Redis, and MinIO) using Docker Compose.
+## 🏗️ 1. Infrastructure Setup
+Athena requires a local FOSS stack. Ensure **Docker Desktop** is running.
 
 1. Open a terminal in the project root.
-2. Run:
+2. Start the database, cache, and storage:
    ```powershell
    docker-compose up -d
    ```
-   *Note: Use `docker ps` to verify that the containers are running.*
+   *Verify with `docker ps` that `athena_db`, `athena_redis`, and `athena_minio` are healthy.*
 
 ---
 
-## 3. Backend Setup
-Set up the Python environment and install dependencies.
+## 🐍 2. Backend & AI Setup
+Set up the Python environment for the FastAPI engine and YOLO/ANPR models.
 
-1. **Create a virtual environment**:
+1. **Initialize Virtual Environment**:
    ```powershell
    python -m venv .venv
-   ```
-2. **Activate the virtual environment**:
-   ```powershell
    .venv\Scripts\Activate.ps1
    ```
-3. **Install dependencies**:
+2. **Install All Dependencies**:
    ```powershell
-   # Core dependencies
+   # Core & Web
    pip install -r requirements.txt
-   # ML dependencies (YOLO, ANPR)
+   # AI Models (YOLOv8, EasyOCR)
    pip install -r requirements-ml.txt
-   # Dev dependencies (Ruff, Pytest)
+   # Development tools
    pip install -e ".[dev]"
    ```
 
 ---
 
-## 4. Frontend Setup
-Set up the React Control Dashboard.
+## ⚛️ 3. Control Dashboard Setup
+Prepare the React-based Command Center.
 
-1. Navigate to the dashboard directory:
+1. Navigate to the dashboard:
    ```powershell
    cd dashboard/control-dashboard
    ```
-2. **Install dependencies**:
+2. **Install Packages**:
    ```powershell
    npm install
    ```
 
 ---
 
-## 5. Running the Project
-You will need two separate terminal windows (with the backend venv activated in the first one).
+## 🚀 4. Running the Full System
+You will need **three** terminal windows active.
 
-### Terminal 1: Backend API
-From the project root:
+### Terminal 1: The Athena Engine
+From the project root (ensure venv is active):
 ```powershell
 uvicorn src.services.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### Terminal 2: Control Dashboard
+### Terminal 2: The Command Center
 From `dashboard/control-dashboard`:
 ```powershell
 npm run dev
 ```
-- **Login/View Dashboard**: Follow the local URL provided by Vite (usually [http://localhost:5173](http://localhost:5173)).
+- **Live Map**: Open the URL provided by Vite (usually [http://localhost:5173](http://localhost:5173)).
 
----
+### Terminal 3: Feature Demonstration (Mock Data)
+Once the backend and frontend are running, use the simulation scripts to see the app in action:
 
-## 6. Simulating Mock Data
-To see the dashboard in action with live-updating markers, run the population script while the backend and frontend are active.
-
-1. Open a new terminal.
-2. Activate the venv: `.venv\Scripts\Activate.ps1`.
-3. Run:
+1. **Populate Standard Data**:
    ```powershell
    python populate_dashboard.py
    ```
-   This will register officers, tracked vehicles, and trigger mock alerts that appear instantly on your map!
+   *This spawns 3 police officers and registers critical vehicles. Watch them appear on the map!*
+
+2. **Trigger Route Prediction (Step-by-Step)**:
+   The predictive engine requires a history of movement for a **Critical Vehicle**. 
+   
+   **Step 1**: Ensure Terminal 1 (Backend) and Terminal 2 (Frontend) are running.
+   **Step 2**: Open a new terminal and run the simulation script:
+     ```powershell
+     python simulate_vehicle.py
+     ```
+   **Step 3**: Refresh the Control Dashboard map ([http://localhost:5173](http://localhost:5173)).
+   **Step 4**: Locate the red vehicle icon labeled **KA-05-PREDICT**.
+   **Step 5**: Observe the **dashed line** extending forward. This is the OSRM-based prediction of where the vehicle will likely be in the next 10-15 minutes.
 
 ---
 
-## 💡 Alternative: All-in-One Demo Launcher
-If you want to quickly see the project running with simplified HTML views without setting up Node.js for the dashboard:
+## 🎯 5. Core Features to Explore
+- **🚦 Incident Detection**: Simulated incidents appear on the map. Use the "Clear" button in the dashboard to resolve them.
+- **🚔 Officer Tracking**: Watch police units move in real-time as they report GPS updates.
+- **🚗 Critical Watchlist**: Track specifically flagged vehicles across the city.
+- **⚡ Proximity Alerts**: Look for intercept notifications when a suspect vehicle is near a police unit.
+- **🔮 Route Prediction**: Observe the dashed "future path" lines that project where a vehicle is likely heading based on its speed and direction.
+
+---
+
+## 💡 All-in-One Quick Start (Legacy Mode)
+If you don't want to set up Node.js, run the simplified Python demo:
 ```powershell
 python run_demo.py
 ```
-This serves the dashboard as static HTML on [http://localhost:3000](http://localhost:3000).
+*This serves local HTML versions of the dashboard on port 3000.*
